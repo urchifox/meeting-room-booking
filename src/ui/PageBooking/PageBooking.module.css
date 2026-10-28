@@ -1,0 +1,11 @@
+.pageBooking {
+	padding: 2rem;
+
+	display: flex;
+	flex-direction: column;
+	gap: 2rem;
+}
+
+.errorMessage {
+	white-space: pre-line;
+}
