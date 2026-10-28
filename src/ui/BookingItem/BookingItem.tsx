@@ -15,8 +15,8 @@ export function BookingItem({
 		<li className={styles.bookingItem}>
 			{booking.title && <h2>{booking.title}</h2>}
 			<p>{booking.date}</p>
-			<p>{booking.start}</p>
-			<p>{booking.end}</p>
+			<p>{booking.timeRange.start}</p>
+			<p>{booking.timeRange.end}</p>
 			<Button onClick={() => onEditClick(booking)}>Edit</Button>
 			<Button onClick={() => void deleteBooking(booking.id)}>Delete</Button>
 		</li>
