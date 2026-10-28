@@ -2,6 +2,8 @@ import styles from "./BookingForm.module.css"
 
 import { type ChangeEvent, useState } from "react"
 
+import { getToday, isHourMinute, isYearMonthDay } from "../../domain/date"
+import { END_TIME, START_TIME } from "../../domain/rules"
 import type { BookingInfo, HourMinute, YearMonthDay } from "../../types/types"
 import { Button } from "../Button/Button"
 
@@ -60,7 +62,12 @@ export function BookingForm({
 	}
 
 	const submitBooking = () => {
-		if (values.date === "" || values.start === "" || values.end === "") {
+		if (
+			!isYearMonthDay(values.date) ||
+			!isHourMinute(values.start) ||
+			!isHourMinute(values.end)
+		) {
+			alert("Invalid date or time. Please check the format and try again.")
 			return
 		}
 
@@ -102,6 +109,8 @@ export function BookingForm({
 					name="date"
 					value={values.date}
 					onChange={onChange}
+					min={getToday()}
+					required
 				/>
 			</div>
 			<div className={styles.formGroup}>
@@ -112,6 +121,9 @@ export function BookingForm({
 					name="start"
 					value={values.start}
 					onChange={onChange}
+					min={START_TIME}
+					max={END_TIME}
+					required
 				/>
 			</div>
 			<div className={styles.formGroup}>
@@ -122,6 +134,9 @@ export function BookingForm({
 					name="end"
 					value={values.end}
 					onChange={onChange}
+					min={START_TIME}
+					max={END_TIME}
+					required
 				/>
 			</div>
 
