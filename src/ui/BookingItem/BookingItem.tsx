@@ -1,8 +1,8 @@
 import styles from "./BookingItem.module.css"
 
+import { deleteBooking } from "../../domain/bookings"
 import type { BookingInfo } from "../../types/types"
 import { Button } from "../Button/Button"
-import { deleteBooking } from "../../domain/bookings"
 
 export function BookingItem({
 	booking,
