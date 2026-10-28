@@ -1,14 +1,15 @@
 import styles from "./BookingItem.module.css"
 
-import { deleteBooking } from "../../domain/bookings"
 import type { BookingInfo } from "../../types/types"
 import { Button } from "../Button/Button"
 
 export function BookingItem({
 	booking,
+	onDeleteClick,
 	onEditClick,
 }: {
 	booking: BookingInfo
+	onDeleteClick: (id: string) => void
 	onEditClick: (booking: BookingInfo) => void
 }) {
 	return (
@@ -18,7 +19,7 @@ export function BookingItem({
 			<p>{booking.timeRange.start}</p>
 			<p>{booking.timeRange.end}</p>
 			<Button onClick={() => onEditClick(booking)}>Edit</Button>
-			<Button onClick={() => void deleteBooking(booking.id)}>Delete</Button>
+			<Button onClick={() => onDeleteClick(booking.id)}>Delete</Button>
 		</li>
 	)
 }

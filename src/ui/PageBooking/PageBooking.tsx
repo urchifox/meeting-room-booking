@@ -3,7 +3,12 @@ import styles from "./PageBooking.module.css"
 import dayjs from "dayjs"
 import { useEffect, useState } from "react"
 
-import { addBooking, getBookings, updateBooking } from "../../domain/bookings"
+import {
+	tryAddBooking,
+	tryDeleteBooking,
+	getBookings,
+	tryUpdateBooking,
+} from "../../domain/bookings"
 import type { BookingInfo } from "../../types/types"
 import { BookingForm } from "../BookingForm/BookingForm"
 import { BookingsList } from "../BookingsList/BookingsList"
@@ -32,11 +37,16 @@ export function PageBooking() {
 		setIsModalFormOpen(true)
 	}
 
+	const showErrorMessage = (errors: Array<string>) => {
+		setErrorMessage(errors.join("\n"))
+		setIsErrorModalOpen(true)
+	}
+
 	const onSubmit = (booking: BookingInfo) => {
 		const otherBookings = (bookings ?? []).filter(
 			(item) => item.id !== booking.id
 		)
-		const saveBooking = bookingInfo ? updateBooking : addBooking
+		const saveBooking = bookingInfo ? tryUpdateBooking : tryAddBooking
 
 		void saveBooking({ booking, otherBookings }).then((result) => {
 			if (result.valid) {
@@ -58,8 +68,24 @@ export function PageBooking() {
 				return
 			}
 
-			setErrorMessage(result.errors.join("\n"))
-			setIsErrorModalOpen(true)
+			showErrorMessage(result.errors)
+		})
+	}
+
+	const onDeleteClick = (id: string) => {
+		void tryDeleteBooking(id).then((result) => {
+			if (!result.valid) {
+				showErrorMessage(result.errors)
+				return
+			}
+
+			setBookings((current) => {
+				if (current === null) {
+					return current
+				}
+
+				return current.filter((item) => item.id !== id)
+			})
 		})
 	}
 
@@ -106,7 +132,11 @@ export function PageBooking() {
 			{bookings === null && <p>Loading...</p>}
 			{isError && <p>Error loading bookings</p>}
 			{bookings !== null && (
-				<BookingsList bookings={bookings} onEditClick={onEditClick} />
+				<BookingsList
+					bookings={bookings}
+					onDeleteClick={onDeleteClick}
+					onEditClick={onEditClick}
+				/>
 			)}
 			<Modal isOpen={isModalFormOpen} onClose={() => setIsModalFormOpen(false)}>
 				<BookingForm bookingInfo={bookingInfo} onSubmit={onSubmit} />

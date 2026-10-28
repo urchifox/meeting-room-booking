@@ -5,9 +5,11 @@ import { BookingItem } from "../BookingItem/BookingItem"
 
 export function BookingsList({
 	bookings,
+	onDeleteClick,
 	onEditClick,
 }: {
 	bookings: Array<BookingInfo>
+	onDeleteClick: (id: string) => void
 	onEditClick: (booking: BookingInfo) => void
 }) {
 	const items = bookings.map((booking) => {
@@ -15,6 +17,7 @@ export function BookingsList({
 			<BookingItem
 				key={booking.id}
 				booking={booking}
+				onDeleteClick={onDeleteClick}
 				onEditClick={onEditClick}
 			/>
 		)

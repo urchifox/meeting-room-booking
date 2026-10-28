@@ -1,15 +1,38 @@
 import dayjs from "dayjs"
 
-import { bookings } from "../mocks/mockBookingsData"
-import type { BookingInfo, HourMinute, ValidationResult, YearMonthDay } from "../types/types"
+import {
+	addBookingToServer,
+	deleteBookingFromServer,
+	getBookingsFromServer,
+	updateBookingOnServer,
+} from "../services/serverAdapter"
+import type {
+	BookingInfo,
+	HourMinute,
+	ValidationResult,
+	YearMonthDay,
+} from "../types/types"
 import { isValidForBooking } from "./validation"
 
-export function getBookings(date: string): Promise<Array<BookingInfo>> {
-	const filteredBookings = bookings.filter((booking) => booking.date === date)
-	return Promise.resolve(filteredBookings)
+function convertServerResponceToValidationResult(
+	response: { statusCode: 200 } | { statusCode: 404 | 409; message: string }
+): ValidationResult {
+	if (response.statusCode === 200) {
+		return { valid: true }
+	}
+
+	return {
+		valid: false,
+		errors: [response.message],
+	}
 }
 
-export function addBooking({
+export async function getBookings(date: string): Promise<Array<BookingInfo>> {
+	const response = await getBookingsFromServer(date);
+	return response.body;
+}
+
+export async function tryAddBooking({
 	booking,
 	otherBookings,
 }: {
@@ -27,10 +50,15 @@ export function addBooking({
 		otherBookings,
 	})
 
-	return Promise.resolve(validationResult)
+	if (!validationResult.valid) {
+		return Promise.resolve(validationResult)
+	}
+
+	const response = await addBookingToServer(booking);
+	return convertServerResponceToValidationResult(response);
 }
 
-export function updateBooking({
+export async function tryUpdateBooking({
 	booking,
 	otherBookings,
 }: {
@@ -48,10 +76,15 @@ export function updateBooking({
 		otherBookings,
 	})
 
-	return Promise.resolve(validationResult)
+	if (!validationResult.valid) {
+		return Promise.resolve(validationResult)
+	}
+
+	const response = await updateBookingOnServer(booking);
+	return convertServerResponceToValidationResult(response);
 }
 
-export function deleteBooking(id: string): Promise<void> {
-	console.log("deleteBooking", id)
-	return Promise.resolve()
+export async function tryDeleteBooking(id: string): Promise<ValidationResult> {
+	const response = await deleteBookingFromServer(id);
+	return convertServerResponceToValidationResult(response);
 }
