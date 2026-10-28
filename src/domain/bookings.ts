@@ -28,8 +28,8 @@ function convertServerResponceToValidationResult(
 }
 
 export async function getBookings(date: string): Promise<Array<BookingInfo>> {
-	const response = await getBookingsFromServer(date);
-	return response.body;
+	const response = await getBookingsFromServer(date)
+	return response.body
 }
 
 export async function tryAddBooking({
@@ -54,8 +54,8 @@ export async function tryAddBooking({
 		return Promise.resolve(validationResult)
 	}
 
-	const response = await addBookingToServer(booking);
-	return convertServerResponceToValidationResult(response);
+	const response = await addBookingToServer(booking)
+	return convertServerResponceToValidationResult(response)
 }
 
 export async function tryUpdateBooking({
@@ -80,11 +80,11 @@ export async function tryUpdateBooking({
 		return Promise.resolve(validationResult)
 	}
 
-	const response = await updateBookingOnServer(booking);
-	return convertServerResponceToValidationResult(response);
+	const response = await updateBookingOnServer(booking)
+	return convertServerResponceToValidationResult(response)
 }
 
 export async function tryDeleteBooking(id: string): Promise<ValidationResult> {
-	const response = await deleteBookingFromServer(id);
-	return convertServerResponceToValidationResult(response);
+	const response = await deleteBookingFromServer(id)
+	return convertServerResponceToValidationResult(response)
 }

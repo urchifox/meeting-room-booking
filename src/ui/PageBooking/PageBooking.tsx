@@ -4,9 +4,9 @@ import dayjs from "dayjs"
 import { useEffect, useState } from "react"
 
 import {
+	getBookings,
 	tryAddBooking,
 	tryDeleteBooking,
-	getBookings,
 	tryUpdateBooking,
 } from "../../domain/bookings"
 import type { BookingInfo } from "../../types/types"
