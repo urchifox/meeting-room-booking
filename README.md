@@ -37,6 +37,8 @@ I built the app in this order:
 
 These were in the plan and are not finished yet:
 
+- Add the current date and time as initial values in the form
+- Replace the alert with a modal message (I just forgot about that...)
 - Disable buttons for past bookings
 - Fix tests and refactor, especially the server adapter and the bookings module
 - Check accessibility
