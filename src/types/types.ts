@@ -17,3 +17,12 @@ export type TimeRange = {
 	start: HourMinute
 	end: HourMinute
 }
+
+export type ValidationResult =
+	| {
+			valid: true
+	  }
+	| {
+			valid: false
+			errors: Array<string>
+	  }
