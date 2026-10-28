@@ -2,14 +2,14 @@ import styles from "./BookingForm.module.css"
 
 import { type ChangeEvent, useState } from "react"
 
-import type { BookingInfo } from "../../types/types"
+import type { BookingInfo, HourMinute, YearMonthDay } from "../../types/types"
 import { Button } from "../Button/Button"
 
 type BookingFormValues = {
 	title: string
-	date: string
-	start: string
-	end: string
+	date: "" | YearMonthDay
+	start: "" | HourMinute
+	end: "" | HourMinute
 }
 
 const defaultValues: BookingFormValues = {
@@ -23,8 +23,8 @@ function toFormValues(bookingInfo?: BookingInfo): BookingFormValues {
 	return {
 		title: bookingInfo?.title ?? defaultValues.title,
 		date: bookingInfo?.date ?? defaultValues.date,
-		start: bookingInfo?.start ?? defaultValues.start,
-		end: bookingInfo?.end ?? defaultValues.end,
+		start: bookingInfo?.timeRange.start ?? defaultValues.start,
+		end: bookingInfo?.timeRange.end ?? defaultValues.end,
 	}
 }
 
@@ -60,11 +60,17 @@ export function BookingForm({
 	}
 
 	const submitBooking = () => {
+		if (values.date === "" || values.start === "" || values.end === "") {
+			return
+		}
+
 		onSubmit({
 			id: bookingInfo?.id ?? crypto.randomUUID(),
 			date: values.date,
-			start: values.start,
-			end: values.end,
+			timeRange: {
+				start: values.start,
+				end: values.end,
+			},
 			title: values.title === "" ? undefined : values.title,
 		})
 	}
