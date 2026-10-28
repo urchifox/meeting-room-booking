@@ -3,7 +3,7 @@ import styles from "./PageBooking.module.css"
 import dayjs from "dayjs"
 import { useEffect, useState } from "react"
 
-import { getBookings } from "../../domain/bookings"
+import { addBooking, getBookings, updateBooking } from "../../domain/bookings"
 import type { BookingInfo } from "../../types/types"
 import { BookingForm } from "../BookingForm/BookingForm"
 import { BookingsList } from "../BookingsList/BookingsList"
@@ -19,6 +19,8 @@ export function PageBooking() {
 	const [bookingInfo, setBookingInfo] = useState<BookingInfo | undefined>(
 		undefined
 	)
+	const [errorMessage, setErrorMessage] = useState("")
+	const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
 
 	const onAddClick = () => {
 		setBookingInfo(undefined)
@@ -31,19 +33,34 @@ export function PageBooking() {
 	}
 
 	const onSubmit = (booking: BookingInfo) => {
-		setBookings((current) => {
-			if (current === null) {
-				return [booking]
+		const otherBookings = (bookings ?? []).filter(
+			(item) => item.id !== booking.id
+		)
+		const saveBooking = bookingInfo ? updateBooking : addBooking
+
+		void saveBooking({ booking, otherBookings }).then((result) => {
+			if (result.valid) {
+				setBookings((current) => {
+					if (current === null) {
+						return [booking]
+					}
+
+					const exists = current.some((item) => item.id === booking.id)
+					if (!exists) {
+						return [...current, booking]
+					}
+
+					return current.map((item) =>
+						item.id === booking.id ? booking : item
+					)
+				})
+				setIsModalFormOpen(false)
+				return
 			}
 
-			const exists = current.some((item) => item.id === booking.id)
-			if (!exists) {
-				return [...current, booking]
-			}
-
-			return current.map((item) => (item.id === booking.id ? booking : item))
+			setErrorMessage(result.errors.join("\n"))
+			setIsErrorModalOpen(true)
 		})
-		setIsModalFormOpen(false)
 	}
 
 	const onDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,6 +110,12 @@ export function PageBooking() {
 			)}
 			<Modal isOpen={isModalFormOpen} onClose={() => setIsModalFormOpen(false)}>
 				<BookingForm bookingInfo={bookingInfo} onSubmit={onSubmit} />
+			</Modal>
+			<Modal
+				isOpen={isErrorModalOpen}
+				onClose={() => setIsErrorModalOpen(false)}
+			>
+				<p className={styles.errorMessage}>{errorMessage}</p>
 			</Modal>
 		</section>
 	)
