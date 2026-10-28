@@ -1,6 +1,6 @@
 import type { BookingInfo } from "../types/types"
 
-export const bookings = [
+export const bookings: Array<BookingInfo> = [
 	{
 		id: "1",
 		date: "2026-10-28",
@@ -17,4 +17,4 @@ export const bookings = [
 		date: "2026-10-29",
 		timeRange: { start: "13:00", end: "14:00" },
 	},
-] satisfies Array<BookingInfo>
+]

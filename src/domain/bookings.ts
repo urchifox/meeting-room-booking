@@ -1,6 +1,6 @@
 import dayjs from "dayjs"
 
-import { bookings } from "../mocks/bookings"
+import { bookings } from "../mocks/mockBookingsData"
 import type { BookingInfo, HourMinute, ValidationResult, YearMonthDay } from "../types/types"
 import { isValidForBooking } from "./validation"
 
