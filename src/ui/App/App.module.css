@@ -12,7 +12,7 @@
 }
 
 *:focus-visible {
-	outline: 3px solid var(--color-interactive-secondary);
+	outline: 3px solid black;
 	outline-offset: 0.25rem;
 	border-radius: 0.15rem;
 }
