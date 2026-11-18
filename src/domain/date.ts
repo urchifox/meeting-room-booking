@@ -38,3 +38,7 @@ export function getDayjs({
 export function getToday(): YearMonthDay {
 	return dayjs().format(DATE_FORMAT) as YearMonthDay
 }
+
+export function getCurrentTime(): HourMinute {
+	return dayjs().format("HH:mm") as HourMinute
+}

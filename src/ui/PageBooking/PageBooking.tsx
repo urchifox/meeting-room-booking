@@ -1,6 +1,5 @@
 import styles from "./PageBooking.module.css"
 
-import dayjs from "dayjs"
 import { useEffect, useState } from "react"
 
 import {
@@ -16,15 +15,16 @@ import {
 	selectDate,
 	updateBooking,
 } from "../../store/bookingsSlice"
-import type { BookingInfo, HourMinute, YearMonthDay } from "../../types/types"
+import type { BookingInfo, YearMonthDay } from "../../types/types"
 import { BookingForm } from "../BookingForm/BookingForm"
 import { BookingsList } from "../BookingsList/BookingsList"
 import { Button } from "../Button/Button"
 import { Modal } from "../Modal/Modal"
 import { useAppDispatch, useAppSelector } from "../hooks/store"
+import { getCurrentTime, getToday } from "../../domain/date"
 
 export function PageBooking() {
-	const today = dayjs().format("YYYY-MM-DD")
+	const today = getToday()
 	const dispatch = useAppDispatch()
 	const date = useAppSelector(selectDate)
 	const bookings = useAppSelector(selectAllBookings)
@@ -55,11 +55,10 @@ export function PageBooking() {
 		const otherBookings = (bookings ?? []).filter(
 			(item) => item.id !== booking.id
 		)
-		const today = dayjs().format("YYYY-MM-DD") as YearMonthDay
-		const currentTime = dayjs().format("HH:mm") as HourMinute
+
 		const isNewBooking = bookingInfo === undefined
 		const saveBooking = isNewBooking
-			? tryAddBooking({ booking, otherBookings, today, currentTime })
+			? tryAddBooking({ booking, otherBookings, today: getToday(), currentTime: getCurrentTime() })
 			: tryUpdateBooking({ booking, otherBookings })
 
 		void saveBooking
