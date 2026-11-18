@@ -1,5 +1,5 @@
 import { getBookingsFromServer } from "../services/serverAdapter"
-import type { BookingInfo } from "../types/types"
+import type { BookingInfo, HourMinute, YearMonthDay } from "../types/types"
 import { tryAddBooking, tryDeleteBooking, tryUpdateBooking } from "./bookings"
 
 const booking = {
@@ -9,16 +9,29 @@ const booking = {
 	title: "Domain test",
 } satisfies BookingInfo
 
+const today = "2026-11-18" satisfies YearMonthDay
+const currentTime = "09:00" satisfies HourMinute
+
 describe("bookings server errors", () => {
 	afterEach(async () => {
 		await tryDeleteBooking(booking.id)
 	})
 
 	it("does not add a booking when the server rejects it", async () => {
-		const created = await tryAddBooking({ booking, otherBookings: [] })
+		const created = await tryAddBooking({
+			booking,
+			otherBookings: [],
+			today,
+			currentTime,
+		})
 		expect(created).toEqual({ valid: true })
 
-		const duplicate = await tryAddBooking({ booking, otherBookings: [] })
+		const duplicate = await tryAddBooking({
+			booking,
+			otherBookings: [],
+			today,
+			currentTime,
+		})
 		expect(duplicate).toEqual({
 			valid: false,
 			errors: ["A booking with this id already exists"],

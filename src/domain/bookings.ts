@@ -35,13 +35,14 @@ export async function getBookings(date: string): Promise<Array<BookingInfo>> {
 export async function tryAddBooking({
 	booking,
 	otherBookings,
+	today,
+	currentTime,
 }: {
 	booking: BookingInfo
 	otherBookings: BookingInfo[]
+	today: YearMonthDay
+	currentTime: HourMinute
 }): Promise<ValidationResult> {
-	const today = dayjs().format("YYYY-MM-DD") as YearMonthDay
-	const currentTime = dayjs().format("HH:mm") as HourMinute
-
 	const validationResult = isValidForBooking({
 		today,
 		currentTime,

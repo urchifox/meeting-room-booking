@@ -9,7 +9,7 @@ import {
 	tryDeleteBooking,
 	tryUpdateBooking,
 } from "../../domain/bookings"
-import type { BookingInfo } from "../../types/types"
+import type { BookingInfo, HourMinute, YearMonthDay } from "../../types/types"
 import { BookingForm } from "../BookingForm/BookingForm"
 import { BookingsList } from "../BookingsList/BookingsList"
 import { Button } from "../Button/Button"
@@ -46,9 +46,13 @@ export function PageBooking() {
 		const otherBookings = (bookings ?? []).filter(
 			(item) => item.id !== booking.id
 		)
-		const saveBooking = bookingInfo ? tryUpdateBooking : tryAddBooking
+		const today = dayjs().format("YYYY-MM-DD") as YearMonthDay
+		const currentTime = dayjs().format("HH:mm") as HourMinute
+		const saveBooking = bookingInfo
+			? tryUpdateBooking({ booking, otherBookings })
+			: tryAddBooking({ booking, otherBookings, today, currentTime })
 
-		void saveBooking({ booking, otherBookings }).then((result) => {
+		void saveBooking.then((result) => {
 			if (result.valid) {
 				if (booking.date === date) {
 					setBookings((current) => {
