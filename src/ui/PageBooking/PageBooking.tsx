@@ -87,22 +87,24 @@ export function PageBooking() {
 	}
 
 	const onDeleteClick = (id: string) => {
-		void tryDeleteBooking(id).then((result) => {
-			if (!result.valid) {
-				showErrorMessage(result.errors)
-				return
-			}
-
-			setBookings((current) => {
-				if (current === null) {
-					return current
+		void tryDeleteBooking(id)
+			.then((result) => {
+				if (!result.valid) {
+					showErrorMessage(result.errors)
+					return
 				}
 
-				return current.filter((item) => item.id !== id)
+				setBookings((current) => {
+					if (current === null) {
+						return current
+					}
+
+					return current.filter((item) => item.id !== id)
+				})
 			})
-		}).catch((error) => {
-			showErrorMessage([error.message])
-		})
+			.catch((error) => {
+				showErrorMessage([error.message])
+			})
 	}
 
 	const onDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
