@@ -50,20 +50,22 @@ export function PageBooking() {
 
 		void saveBooking({ booking, otherBookings }).then((result) => {
 			if (result.valid) {
-				setBookings((current) => {
-					if (current === null) {
-						return [booking]
-					}
+				if (booking.date === date) {
+					setBookings((current) => {
+						if (current === null) {
+							return [booking]
+						}
 
-					const exists = current.some((item) => item.id === booking.id)
-					if (!exists) {
-						return [...current, booking]
-					}
+						const exists = current.some((item) => item.id === booking.id)
+						if (!exists) {
+							return [...current, booking]
+						}
 
-					return current.map((item) =>
-						item.id === booking.id ? booking : item
-					)
-				})
+						return current.map((item) =>
+							item.id === booking.id ? booking : item
+						)
+					})
+				}
 				setIsModalFormOpen(false)
 				return
 			}
