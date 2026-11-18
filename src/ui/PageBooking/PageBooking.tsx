@@ -52,8 +52,13 @@ export function PageBooking() {
 			? tryUpdateBooking({ booking, otherBookings })
 			: tryAddBooking({ booking, otherBookings, today, currentTime })
 
-		void saveBooking.then((result) => {
-			if (result.valid) {
+		void saveBooking
+			.then((result) => {
+				if (!result.valid) {
+					showErrorMessage(result.errors)
+					return
+				}
+
 				if (booking.date === date) {
 					setBookings((current) => {
 						if (current === null) {
@@ -62,22 +67,23 @@ export function PageBooking() {
 
 						const exists = current.some((item) => item.id === booking.id)
 						if (!exists) {
-							return [...current, booking]
+							return [...current, booking].sort((a, b) =>
+								a.timeRange.start.localeCompare(b.timeRange.start)
+							)
 						}
 
-						return current.map((item) =>
-							item.id === booking.id ? booking : item
-						)
+						return current
+							.map((item) => (item.id === booking.id ? booking : item))
+							.sort((a, b) =>
+								a.timeRange.start.localeCompare(b.timeRange.start)
+							)
 					})
 				}
 				setIsModalFormOpen(false)
-				return
-			}
-
-			showErrorMessage(result.errors)
-		}).catch((error) => {
-			showErrorMessage([error.message])
-		})
+			})
+			.catch((error) => {
+				showErrorMessage([error.message])
+			})
 	}
 
 	const onDeleteClick = (id: string) => {
