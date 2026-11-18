@@ -2,11 +2,7 @@ import styles from "./PageBooking.module.css"
 
 import { useEffect, useState } from "react"
 
-import {
-	tryAddBooking,
-	tryDeleteBooking,
-	tryUpdateBooking,
-} from "../../domain/bookings"
+import { getToday } from "../../domain/date"
 import {
 	addBooking,
 	deleteBooking,
@@ -21,7 +17,6 @@ import { BookingsList } from "../BookingsList/BookingsList"
 import { Button } from "../Button/Button"
 import { Modal } from "../Modal/Modal"
 import { useAppDispatch, useAppSelector } from "../hooks/store"
-import { getCurrentTime, getToday } from "../../domain/date"
 
 export function PageBooking() {
 	const today = getToday()
@@ -52,64 +47,26 @@ export function PageBooking() {
 	}
 
 	const onSubmit = (booking: BookingInfo) => {
-		const otherBookings = (bookings ?? []).filter(
-			(item) => item.id !== booking.id
-		)
-
 		const isNewBooking = bookingInfo === undefined
-		const saveBooking = isNewBooking
-			? tryAddBooking({ booking, otherBookings, today: getToday(), currentTime: getCurrentTime() })
-			: tryUpdateBooking({ booking, otherBookings })
+		const action = isNewBooking ? addBooking : updateBooking
 
-		void saveBooking
-			.then((result) => {
-				if (!result.valid) {
-					showErrorMessage(result.errors)
-					return
-				}
-
-				if (isNewBooking) {
-					dispatch(addBooking(booking))
-				} else {
-					dispatch(updateBooking(booking))
-				}
-				setIsModalFormOpen(false)
-			})
-			.catch((error) => {
-				showErrorMessage([error.message])
-			})
+		dispatch(action(booking))
+			.unwrap()
+			.then(() => setIsModalFormOpen(false))
+			.catch((error) => showErrorMessage([error]))
 	}
 
 	const onDeleteClick = (id: string) => {
-		void tryDeleteBooking(id)
-			.then((result) => {
-				if (!result.valid) {
-					showErrorMessage(result.errors)
-					return
-				}
-
-				dispatch(deleteBooking(id))
-			})
-			.catch((error) => {
-				showErrorMessage([error.message])
-			})
+		dispatch(deleteBooking(id))
+			.unwrap()
+			.catch((error) => showErrorMessage([error]))
 	}
 
 	const onDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const newDate = event.target.value ?? today
-		const request = dispatch(loadBookings({ date: newDate as YearMonthDay }))
-		request.unwrap().catch((error: unknown) => {
-			if (
-				typeof error === "object" &&
-				error !== null &&
-				"name" in error &&
-				error.name === "AbortError"
-			) {
-				return
-			}
-
-			setError(true)
-		})
+		dispatch(loadBookings({ date: newDate as YearMonthDay }))
+			.unwrap()
+			.catch(() => setError(true))
 	}
 
 	useEffect(() => {
