@@ -1,6 +1,17 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit"
-import { persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER, persistStore } from "redux-persist"
+import {
+	FLUSH,
+	PAUSE,
+	PERSIST,
+	PURGE,
+	REGISTER,
+	REHYDRATE,
+	persistReducer,
+	persistStore,
+} from "redux-persist"
 import storage from "redux-persist/es/storage"
+
+import { bookingsReducer } from "./bookingsSlice"
 
 const persistConfig = {
 	key: "root",
@@ -8,7 +19,7 @@ const persistConfig = {
 }
 
 const rootReducer = combineReducers({
-
+	bookings: bookingsReducer,
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)

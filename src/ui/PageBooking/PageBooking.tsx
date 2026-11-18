@@ -4,21 +4,30 @@ import dayjs from "dayjs"
 import { useEffect, useState } from "react"
 
 import {
-	getBookings,
 	tryAddBooking,
 	tryDeleteBooking,
 	tryUpdateBooking,
 } from "../../domain/bookings"
+import {
+	addBooking,
+	deleteBooking,
+	loadBookings,
+	selectAllBookings,
+	selectDate,
+	updateBooking,
+} from "../../store/bookingsSlice"
 import type { BookingInfo, HourMinute, YearMonthDay } from "../../types/types"
 import { BookingForm } from "../BookingForm/BookingForm"
 import { BookingsList } from "../BookingsList/BookingsList"
 import { Button } from "../Button/Button"
 import { Modal } from "../Modal/Modal"
+import { useAppDispatch, useAppSelector } from "../hooks/store"
 
 export function PageBooking() {
 	const today = dayjs().format("YYYY-MM-DD")
-	const [date, setDate] = useState<string>(today)
-	const [bookings, setBookings] = useState<Array<BookingInfo> | null>(null)
+	const dispatch = useAppDispatch()
+	const date = useAppSelector(selectDate)
+	const bookings = useAppSelector(selectAllBookings)
 	const [isError, setError] = useState<boolean>(false)
 	const [isModalFormOpen, setIsModalFormOpen] = useState(false)
 	const [bookingInfo, setBookingInfo] = useState<BookingInfo | undefined>(
@@ -48,9 +57,10 @@ export function PageBooking() {
 		)
 		const today = dayjs().format("YYYY-MM-DD") as YearMonthDay
 		const currentTime = dayjs().format("HH:mm") as HourMinute
-		const saveBooking = bookingInfo
-			? tryUpdateBooking({ booking, otherBookings })
-			: tryAddBooking({ booking, otherBookings, today, currentTime })
+		const isNewBooking = bookingInfo === undefined
+		const saveBooking = isNewBooking
+			? tryAddBooking({ booking, otherBookings, today, currentTime })
+			: tryUpdateBooking({ booking, otherBookings })
 
 		void saveBooking
 			.then((result) => {
@@ -59,25 +69,10 @@ export function PageBooking() {
 					return
 				}
 
-				if (booking.date === date) {
-					setBookings((current) => {
-						if (current === null) {
-							return [booking]
-						}
-
-						const exists = current.some((item) => item.id === booking.id)
-						if (!exists) {
-							return [...current, booking].sort((a, b) =>
-								a.timeRange.start.localeCompare(b.timeRange.start)
-							)
-						}
-
-						return current
-							.map((item) => (item.id === booking.id ? booking : item))
-							.sort((a, b) =>
-								a.timeRange.start.localeCompare(b.timeRange.start)
-							)
-					})
+				if (isNewBooking) {
+					dispatch(addBooking(booking))
+				} else {
+					dispatch(updateBooking(booking))
 				}
 				setIsModalFormOpen(false)
 			})
@@ -94,13 +89,7 @@ export function PageBooking() {
 					return
 				}
 
-				setBookings((current) => {
-					if (current === null) {
-						return current
-					}
-
-					return current.filter((item) => item.id !== id)
-				})
+				dispatch(deleteBooking(id))
 			})
 			.catch((error) => {
 				showErrorMessage([error.message])
@@ -109,8 +98,19 @@ export function PageBooking() {
 
 	const onDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const newDate = event.target.value ?? today
-		setDate(newDate)
-		setBookings(null)
+		const request = dispatch(loadBookings({ date: newDate as YearMonthDay }))
+		request.unwrap().catch((error: unknown) => {
+			if (
+				typeof error === "object" &&
+				error !== null &&
+				"name" in error &&
+				error.name === "AbortError"
+			) {
+				return
+			}
+
+			setError(true)
+		})
 	}
 
 	useEffect(() => {
@@ -118,22 +118,24 @@ export function PageBooking() {
 			return
 		}
 
-		let cancelled = false
-		getBookings(date)
-			.then((value) => {
-				if (!cancelled) {
-					setBookings(value)
-				}
-			})
-			.catch(() => {
-				if (!cancelled) {
-					setError(true)
-				}
-			})
+		const request = dispatch(loadBookings({ date }))
+		request.unwrap().catch((error: unknown) => {
+			if (
+				typeof error === "object" &&
+				error !== null &&
+				"name" in error &&
+				error.name === "AbortError"
+			) {
+				return
+			}
+
+			setError(true)
+		})
+
 		return () => {
-			cancelled = true
+			request.abort()
 		}
-	}, [bookings, date])
+	}, [bookings, date, dispatch])
 
 	return (
 		<section className={styles.pageBooking}>
