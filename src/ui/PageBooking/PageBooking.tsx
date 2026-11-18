@@ -75,6 +75,8 @@ export function PageBooking() {
 			}
 
 			showErrorMessage(result.errors)
+		}).catch((error) => {
+			showErrorMessage([error.message])
 		})
 	}
 
@@ -92,6 +94,8 @@ export function PageBooking() {
 
 				return current.filter((item) => item.id !== id)
 			})
+		}).catch((error) => {
+			showErrorMessage([error.message])
 		})
 	}
 
