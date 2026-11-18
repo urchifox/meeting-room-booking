@@ -125,7 +125,7 @@ export function PageBooking() {
 			<Button onClick={onAddClick}>Add Booking</Button>
 			<input
 				type="date"
-				id="date"
+				id="bookings-list-date"
 				name="date"
 				min={today}
 				value={date}

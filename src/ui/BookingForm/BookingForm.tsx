@@ -105,7 +105,7 @@ export function BookingForm({
 				<label htmlFor="date">Date</label>
 				<input
 					type="date"
-					id="date"
+					id="booking-date"
 					name="date"
 					value={values.date}
 					onChange={onChange}
