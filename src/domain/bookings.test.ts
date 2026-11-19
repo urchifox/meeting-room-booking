@@ -1,6 +1,11 @@
 import { getBookingsFromServer } from "../services/serverAdapter"
 import type { BookingInfo, HourMinute, YearMonthDay } from "../types/types"
-import { tryAddBooking, tryDeleteBooking, tryUpdateBooking } from "./bookings"
+import {
+	sortBookings,
+	tryAddBooking,
+	tryDeleteBooking,
+	tryUpdateBooking,
+} from "./bookings"
 
 const booking = {
 	id: "domain-server-error",
@@ -16,6 +21,107 @@ describe("bookings server errors", () => {
 	afterEach(async () => {
 		await tryDeleteBooking(booking.id)
 	})
+
+	it.each([
+		{
+			bookings: [
+				{
+					id: "afternoon",
+					date: "2026-12-01",
+					timeRange: { start: "14:00", end: "15:00" },
+					title: "Afternoon",
+				},
+				{
+					id: "morning",
+					date: "2026-12-01",
+					timeRange: { start: "09:00", end: "10:00" },
+					title: "Morning",
+				},
+			],
+			expected: [
+				{
+					id: "morning",
+					date: "2026-12-01",
+					timeRange: { start: "09:00", end: "10:00" },
+					title: "Morning",
+				},
+				{
+					id: "afternoon",
+					date: "2026-12-01",
+					timeRange: { start: "14:00", end: "15:00" },
+					title: "Afternoon",
+				},
+			],
+		},
+		{
+			bookings: [
+				{
+					id: "early",
+					date: "2026-12-01",
+					timeRange: { start: "08:30", end: "09:00" },
+					title: "Early",
+				},
+				{
+					id: "midday",
+					date: "2026-12-01",
+					timeRange: { start: "12:00", end: "13:00" },
+					title: "Midday",
+				},
+			],
+			expected: [
+				{
+					id: "early",
+					date: "2026-12-01",
+					timeRange: { start: "08:30", end: "09:00" },
+					title: "Early",
+				},
+				{
+					id: "midday",
+					date: "2026-12-01",
+					timeRange: { start: "12:00", end: "13:00" },
+					title: "Midday",
+				},
+			],
+		},
+		{
+			bookings: [
+				{
+					id: "early-second-day",
+					date: "2026-12-02",
+					timeRange: { start: "08:30", end: "09:00" },
+					title: "Early second day",
+				},
+				{
+					id: "midday-first-day",
+					date: "2026-12-01",
+					timeRange: { start: "12:00", end: "13:00" },
+					title: "Midday first day",
+				},
+			],
+			expected: [
+				{
+					id: "midday-first-day",
+					date: "2026-12-01",
+					timeRange: { start: "12:00", end: "13:00" },
+					title: "Midday first day",
+				},
+				{
+					id: "early-second-day",
+					date: "2026-12-02",
+					timeRange: { start: "08:30", end: "09:00" },
+					title: "Early second day",
+				},
+			],
+		},
+	] satisfies Array<{ bookings: BookingInfo[]; expected: BookingInfo[] }>)(
+		"sorts bookings by start time",
+		({ bookings, expected }) => {
+			const sortedBookings = sortBookings(bookings)
+
+			expect(sortedBookings).toEqual(expected)
+			expect(sortedBookings).not.toBe(bookings)
+		}
+	)
 
 	it("does not add a booking when the server rejects it", async () => {
 		const created = await tryAddBooking({

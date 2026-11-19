@@ -32,6 +32,15 @@ export async function getBookings(date: string): Promise<Array<BookingInfo>> {
 	return response.body
 }
 
+export function sortBookings(bookings: Array<BookingInfo>): Array<BookingInfo> {
+	return [...bookings].sort((a, b) => {
+		if (a.date !== b.date) {
+			return a.date.localeCompare(b.date)
+		}
+		return a.timeRange.start.localeCompare(b.timeRange.start)
+	})
+}
+
 export async function tryAddBooking({
 	booking,
 	otherBookings,

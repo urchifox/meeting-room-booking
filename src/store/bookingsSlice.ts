@@ -7,6 +7,7 @@ import {
 import type { RootState } from "."
 import {
 	getBookings,
+	sortBookings,
 	tryAddBooking,
 	tryDeleteBooking,
 	tryUpdateBooking,
@@ -49,7 +50,7 @@ export const addBooking = createAsyncThunk<
 		const otherBookings = selectAllBookingsExcept(getState(), booking.id)
 		try {
 			const result = await tryAddBooking({
-                booking,
+				booking,
 				otherBookings,
 				today: getToday(),
 				currentTime: getCurrentTime(),
@@ -120,9 +121,7 @@ const bookingsSlice = createSlice({
 			const { date, bookings } = action.payload
 			return {
 				date,
-				bookings: bookings.sort((a, b) =>
-					a.timeRange.start.localeCompare(b.timeRange.start)
-				),
+				bookings: sortBookings(bookings),
 			}
 		},
 
@@ -134,9 +133,7 @@ const bookingsSlice = createSlice({
 				return
 			}
 			state.bookings.push(action.payload)
-			state.bookings.sort((a, b) =>
-				a.timeRange.start.localeCompare(b.timeRange.start)
-			)
+			state.bookings = sortBookings(state.bookings)
 		},
 
 		updateBooking: (
@@ -153,9 +150,7 @@ const bookingsSlice = createSlice({
 			const index = state.bookings.findIndex((booking) => booking.id === id)
 			if (index !== -1) {
 				state.bookings[index] = { ...state.bookings[index], ...updates }
-				state.bookings.sort((a, b) =>
-					a.timeRange.start.localeCompare(b.timeRange.start)
-				)
+				state.bookings = sortBookings(state.bookings)
 			}
 		},
 
