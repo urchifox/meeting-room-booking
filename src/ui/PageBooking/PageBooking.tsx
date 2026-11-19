@@ -41,8 +41,21 @@ export function PageBooking() {
 		setIsModalFormOpen(true)
 	}
 
-	const showErrorMessage = (errors: Array<string>) => {
-		setErrorMessage(errors.join("\n"))
+	const showErrorMessage = (error: unknown) => {
+		let errorMessage = "Unknown error"
+		if (Array.isArray(error)) {
+			errorMessage = error.join("\n")
+		} else if (typeof error === "string") {
+			errorMessage = error
+		} else if (
+			typeof error === "object" &&
+			error !== null &&
+			"name" in error &&
+			typeof error.name === "string"
+		) {
+			errorMessage = error.name
+		}
+		setErrorMessage(errorMessage)
 		setIsErrorModalOpen(true)
 	}
 
@@ -53,13 +66,11 @@ export function PageBooking() {
 		dispatch(action(booking))
 			.unwrap()
 			.then(() => setIsModalFormOpen(false))
-			.catch((error) => showErrorMessage([error]))
+			.catch(showErrorMessage)
 	}
 
 	const onDeleteClick = (id: string) => {
-		dispatch(deleteBooking(id))
-			.unwrap()
-			.catch((error) => showErrorMessage([error]))
+		dispatch(deleteBooking(id)).unwrap().catch(showErrorMessage)
 	}
 
 	const onDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
