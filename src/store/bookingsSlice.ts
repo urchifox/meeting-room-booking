@@ -171,6 +171,8 @@ const bookingsSlice = createSlice({
 				(booking) => booking.id !== action.payload
 			)
 		},
+
+		reset: () => initialState,
 	},
 
 	selectors: {
@@ -184,6 +186,7 @@ const bookingsSlice = createSlice({
 })
 
 export const bookingsReducer = bookingsSlice.reducer
+export const { reset } = bookingsSlice.actions
 export const {
 	selectAllBookings,
 	selectAllBookingsExcept,

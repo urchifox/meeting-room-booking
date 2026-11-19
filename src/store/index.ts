@@ -1,6 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit"
 
-import { bookingsReducer } from "./bookingsSlice"
+import { bookingsReducer, reset } from "./bookingsSlice"
 
 export const store = configureStore({
 	reducer: {
@@ -14,3 +14,7 @@ export type AppThunk<ReturnType = void> = (
 	dispatch: AppDispatch,
 	getState: () => RootState
 ) => ReturnType
+
+export function resetStore() {
+	store.dispatch(reset())
+}
