@@ -181,7 +181,7 @@ const bookingsSlice = createSlice({
 
 	selectors: {
 		selectDate: (state) => state?.date ?? getToday(),
-		selectAllBookings: (state) => state?.bookings ?? [],
+		selectAllBookings: (state) => state?.bookings ?? null,
 		selectAllBookingsExcept: (state, id: BookingInfo["id"]) =>
 			state?.bookings.filter((booking) => booking.id !== id) ?? [],
 		selectBookingById: (state, id: BookingInfo["id"]) =>
