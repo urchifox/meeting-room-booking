@@ -30,15 +30,20 @@ export const loadBookings = createAsyncThunk<
 	Array<BookingInfo>,
 	{ date: YearMonthDay },
 	{ rejectValue: string }
->("bookings/loadBookings", async (arg, { dispatch, rejectWithValue }) => {
-	try {
-		const bookings = await getBookings(arg.date)
-		dispatch(bookingsSlice.actions.setBookings({ date: arg.date, bookings }))
-		return bookings
-	} catch (_) {
-		return rejectWithValue("Failed to load bookings")
+>(
+	"bookings/loadBookings",
+	async (arg, { dispatch, rejectWithValue, signal }) => {
+		try {
+			const bookings = await getBookings(arg.date)
+			if (!signal.aborted) {
+				dispatch(bookingsSlice.actions.setBookings({ date: arg.date, bookings }))
+			}
+			return bookings
+		} catch (_) {
+			return rejectWithValue("Failed to load bookings")
+		}
 	}
-})
+)
 
 export const addBooking = createAsyncThunk<
 	ValidationResult,
