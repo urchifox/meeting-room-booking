@@ -42,14 +42,11 @@ export const loadBookings = createAsyncThunk<
 export const addBooking = createAsyncThunk<
 	ValidationResult,
 	BookingInfo,
-	{ rejectValue: Array<string> }
+	{ state: RootState; rejectValue: Array<string> | string }
 >(
 	"bookings/addBooking",
 	async (booking, { dispatch, rejectWithValue, getState }) => {
-		const otherBookings = selectAllBookingsExcept(
-			getState() as RootState,
-			booking.id
-		)
+		const otherBookings = selectAllBookingsExcept(getState(), booking.id)
 		try {
 			const result = await tryAddBooking({
                 booking,
@@ -63,7 +60,7 @@ export const addBooking = createAsyncThunk<
 			dispatch(bookingsSlice.actions.addBooking(booking))
 			return result
 		} catch (_) {
-			return rejectWithValue(["Failed to add booking"])
+			return rejectWithValue("Failed to add booking")
 		}
 	}
 )
@@ -71,14 +68,11 @@ export const addBooking = createAsyncThunk<
 export const updateBooking = createAsyncThunk<
 	ValidationResult,
 	BookingInfo,
-	{ rejectValue: Array<string> }
+	{ state: RootState; rejectValue: Array<string> | string }
 >(
 	"bookings/updateBooking",
 	async (booking, { dispatch, rejectWithValue, getState }) => {
-		const otherBookings = selectAllBookingsExcept(
-			getState() as RootState,
-			booking.id
-		)
+		const otherBookings = selectAllBookingsExcept(getState(), booking.id)
 		try {
 			const result = await tryUpdateBooking({
 				booking,
@@ -90,7 +84,7 @@ export const updateBooking = createAsyncThunk<
 			dispatch(bookingsSlice.actions.updateBooking(booking))
 			return result
 		} catch (_) {
-			return rejectWithValue(["Failed to update booking"])
+			return rejectWithValue("Failed to update booking")
 		}
 	}
 )
@@ -98,7 +92,7 @@ export const updateBooking = createAsyncThunk<
 export const deleteBooking = createAsyncThunk<
 	ValidationResult,
 	BookingInfo["id"],
-	{ rejectValue: Array<string> }
+	{ rejectValue: Array<string> | string }
 >("bookings/deleteBooking", async (id, { dispatch, rejectWithValue }) => {
 	try {
 		const result = await tryDeleteBooking(id)
@@ -108,7 +102,7 @@ export const deleteBooking = createAsyncThunk<
 		dispatch(bookingsSlice.actions.deleteBooking(id))
 		return result
 	} catch (_) {
-		return rejectWithValue(["Failed to delete booking"])
+		return rejectWithValue("Failed to delete booking")
 	}
 })
 
