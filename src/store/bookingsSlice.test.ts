@@ -7,13 +7,13 @@ import {
 } from "../domain/bookings"
 import type { BookingInfo, YearMonthDay } from "../types/types"
 import {
+	type BookingsState,
 	addBooking,
 	deleteBooking,
-	loadBookings,
-	selectAllBookings,
-	selectAllBookingsExcept,
+	loadBookingsForDay,
+	selectActiveDate,
 	selectBookingById,
-	selectDate,
+	selectBookingsByDay,
 	updateBooking,
 } from "./bookingsSlice"
 import { resetStore, store } from "./index"
@@ -53,21 +53,28 @@ vi.mock("../domain/date", async () => {
 const defaultDate = today
 const otherDate = "2026-12-01" satisfies YearMonthDay
 
-const planning = {
+const bookingOnMorning = {
 	id: "1",
 	date: defaultDate,
 	timeRange: { start: "10:00", end: "11:00" },
-	title: "Planning",
+	title: "Morning",
 } satisfies BookingInfo
 
-const review = {
+const bookingOnLunch = {
 	id: "2",
 	date: defaultDate,
-	timeRange: { start: "14:00", end: "15:00" },
-	title: "Review",
+	timeRange: { start: "13:00", end: "14:00" },
+	title: "Lunch",
 } satisfies BookingInfo
 
-const bookingsOnDefaultDay = [planning] satisfies Array<BookingInfo>
+const bookingOnEvening = {
+	id: "3",
+	date: defaultDate,
+	timeRange: { start: "17:00", end: "18:00" },
+	title: "Evening",
+} satisfies BookingInfo
+
+const bookingsOnDefaultDay = [bookingOnMorning] satisfies Array<BookingInfo>
 
 function makeBookingOnDate(
 	booking: BookingInfo,
@@ -78,172 +85,293 @@ function makeBookingOnDate(
 
 const validationErrors = ["The selected time is already booked"]
 
-function load(nextBookings: Array<BookingInfo>, date: YearMonthDay = defaultDate) {
-	vi.mocked(getBookings).mockResolvedValueOnce(nextBookings)
-	return store.dispatch(loadBookings({ date: date })).unwrap()
+type LoadOptions = {
+	date?: YearMonthDay
+	setDay?: boolean
+}
+
+function dispatchLoadBookings(date: YearMonthDay, setDay: boolean) {
+	return store.dispatch(loadBookingsForDay({ date, setDay }))
+}
+
+type LoadResult = ReturnType<typeof dispatchLoadBookings>
+
+function load(props: LoadOptions & { bookings: Array<BookingInfo> }): LoadResult
+function load(
+	props: LoadOptions & { promise: Promise<Array<BookingInfo>> }
+): LoadResult
+function load(props: LoadOptions & { error: Error }): LoadResult
+function load(props?: LoadOptions): LoadResult
+function load({
+	bookings,
+	promise,
+	error,
+	date = defaultDate,
+	setDay = false,
+}: LoadOptions & {
+	bookings?: Array<BookingInfo>
+	promise?: Promise<Array<BookingInfo>>
+	error?: Error
+} = {}): LoadResult {
+	if (bookings !== undefined) {
+		vi.mocked(getBookings).mockResolvedValueOnce(bookings)
+	} else if (promise !== undefined) {
+		vi.mocked(getBookings).mockReturnValueOnce(promise)
+	} else if (error !== undefined) {
+		vi.mocked(getBookings).mockRejectedValueOnce(error)
+	}
+	return dispatchLoadBookings(date, setDay)
+}
+
+function createDeferred<T>() {
+	let resolve: (value: T) => void = () => {}
+	const promise = new Promise<T>((res) => {
+		resolve = res
+	})
+	return { promise, resolve }
+}
+
+function expectState(expectedState: BookingsState) {
+	const state = store.getState().bookings
+	if (expectedState === null) {
+		expect(state).toBeNull()
+	} else {
+		expect(state).toEqual(expectedState)
+	}
+}
+
+function expectActiveDate(expectedDate: YearMonthDay) {
+	expect(selectActiveDate(store.getState())).toBe(expectedDate)
+}
+
+function expectBookingsOf(
+	date: YearMonthDay,
+	expectedBookings: Array<BookingInfo>
+) {
+	expect(selectBookingsByDay(store.getState(), date)).toEqual(expectedBookings)
 }
 
 describe("bookingsSlice", () => {
 	beforeEach(() => {
 		resetStore()
-		vi.clearAllMocks()
+		vi.resetAllMocks()
 	})
 
-	describe("loadBookings", () => {
-		it("stores bookings when the request finishes", async () => {
-			vi.mocked(getBookings).mockResolvedValue(bookingsOnDefaultDay)
-			await store.dispatch(loadBookings({ date: defaultDate })).unwrap()
+	describe("loadBookingsForDay", () => {
+		it("stores sorted bookings and activates the requested day", async () => {
+			const bookings = [bookingOnLunch, bookingOnMorning]
+			const expectedBookings = [bookingOnMorning, bookingOnLunch]
 
-			expect(sortBookings).toHaveBeenCalledExactlyOnceWith(bookingsOnDefaultDay)
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: bookingsOnDefaultDay,
+			await load({ bookings, setDay: true }).unwrap()
+
+			expect(getBookings).toHaveBeenCalledExactlyOnceWith(defaultDate)
+			expect(sortBookings).toHaveBeenCalledExactlyOnceWith(bookings)
+			expectState({
+				activeDate: defaultDate,
+				bookingsByDate: { [defaultDate]: expectedBookings },
 			})
 		})
 
 		it("does not store bookings when the request is aborted before it resolves", async () => {
-			let resolveBookings: (value: Array<BookingInfo>) => void = () => {}
-			vi.mocked(getBookings).mockImplementation(
-				() =>
-					new Promise((resolve) => {
-						resolveBookings = resolve
-					})
-			)
-			const request = store.dispatch(loadBookings({ date: defaultDate }))
+			const { promise, resolve } = createDeferred<Array<BookingInfo>>()
+			const request = load({ promise, setDay: true })
 			const settled = request.unwrap().then(
 				() => ({ aborted: false }),
-				(error: unknown) => ({ aborted: true, error })
+				(error) => ({ aborted: true, error })
 			)
 
 			request.abort()
-			resolveBookings(bookingsOnDefaultDay)
+			resolve(bookingsOnDefaultDay)
 
-			const result = await settled
-			await Promise.resolve()
-
-			expect(result).toMatchObject({
+			await expect(settled).resolves.toMatchObject({
 				aborted: true,
 				error: { name: "AbortError" },
 			})
-			expect(store.getState().bookings).toBeNull()
+			expectState(null)
 		})
 
-		it("replaces the loaded data when another date is requested", async () => {
-			const bookingsOnOtherDay = [makeBookingOnDate(review, otherDate)]
-			await load(bookingsOnDefaultDay)
-
-			await load(bookingsOnOtherDay, otherDate)
-
-			expect(store.getState().bookings).toEqual({
-				date: otherDate,
+		it("keeps earlier days and activates the newly requested day", async () => {
+			const bookingsOnOtherDay = [makeBookingOnDate(bookingOnLunch, otherDate)]
+			await load({ bookings: bookingsOnDefaultDay, setDay: true }).unwrap()
+			await load({
 				bookings: bookingsOnOtherDay,
+				date: otherDate,
+				setDay: true,
+			}).unwrap()
+
+			expectState({
+				activeDate: otherDate,
+				bookingsByDate: {
+					[defaultDate]: bookingsOnDefaultDay,
+					[otherDate]: bookingsOnOtherDay,
+				},
 			})
 		})
 
-		it("rejects and leaves the day unloaded when loading fails", async () => {
-			vi.mocked(getBookings).mockRejectedValueOnce(new Error("offline"))
-			await expect(
-				store.dispatch(loadBookings({ date: defaultDate })).unwrap()
-			).rejects.toBe("Failed to load bookings")
-			expect(store.getState().bookings).toBeNull()
+		it("returns a stored day without requesting it again", async () => {
+			const bookingsOnOtherDay = [
+				makeBookingOnDate(bookingOnMorning, otherDate),
+			]
+			await load({ bookings: [] }).unwrap()
+			await load({
+				bookings: bookingsOnOtherDay,
+				date: otherDate,
+				setDay: true,
+			}).unwrap()
+
+			await load({ setDay: true }).unwrap()
+
+			expect(getBookings).toHaveBeenCalledTimes(2)
+			expectBookingsOf(defaultDate, [])
+			expectActiveDate(defaultDate)
 		})
 
-		it("keeps the loaded bookings when a later load fails", async () => {
-			await load(bookingsOnDefaultDay)
-			vi.mocked(getBookings).mockRejectedValueOnce(new Error("offline"))
+		it("shares one in-flight request for the same day", async () => {
+			const { promise, resolve } = createDeferred<Array<BookingInfo>>()
+
+			const first = load({ promise, setDay: true }).unwrap()
+			const second = load({}).unwrap()
+			resolve(bookingsOnDefaultDay)
+
+			await expect(Promise.all([first, second])).resolves.toEqual([
+				bookingsOnDefaultDay,
+				bookingsOnDefaultDay,
+			])
+			expect(getBookings).toHaveBeenCalledExactlyOnceWith(defaultDate)
+		})
+
+		it("activates the latest requested day when responses arrive out of order", async () => {
+			const bookingsOnOtherDay = [makeBookingOnDate(bookingOnLunch, otherDate)]
+			const defaultDayResponse = createDeferred<Array<BookingInfo>>()
+			const otherDayResponse = createDeferred<Array<BookingInfo>>()
+
+			const defaultDayLoad = load({
+				promise: defaultDayResponse.promise,
+				setDay: true,
+			})
+			const otherDayLoad = load({
+				promise: otherDayResponse.promise,
+				date: otherDate,
+				setDay: true,
+			})
+
+			otherDayResponse.resolve(bookingsOnOtherDay)
+			await otherDayLoad.unwrap()
+			defaultDayResponse.resolve(bookingsOnDefaultDay)
+			await defaultDayLoad.unwrap()
+
+			expectActiveDate(otherDate)
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
+			expectBookingsOf(otherDate, bookingsOnOtherDay)
+		})
+
+		it("does not activate a day loaded with setDay false", async () => {
+			await load({ bookings: bookingsOnDefaultDay, setDay: true }).unwrap()
+			await load({ bookings: [], date: otherDate }).unwrap()
+
+			expectActiveDate(defaultDate)
+			expectBookingsOf(otherDate, [])
+		})
+
+		it("rejects and leaves the day unloaded when loading fails", async () => {
+			await expect(
+				load({ error: new Error("offline"), setDay: true }).unwrap()
+			).rejects.toBe("Failed to load bookings")
+			expectState(null)
+
+			await load({ bookings: bookingsOnDefaultDay }).unwrap()
+
+			expect(getBookings).toHaveBeenCalledTimes(2)
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
+		})
+
+		it("keeps the loaded state when a later load fails", async () => {
+			await load({ bookings: bookingsOnDefaultDay, setDay: true }).unwrap()
 
 			await expect(
-				store.dispatch(loadBookings({ date: otherDate })).unwrap()
+				load({
+					error: new Error("offline"),
+					date: otherDate,
+					setDay: true,
+				}).unwrap()
 			).rejects.toBe("Failed to load bookings")
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: bookingsOnDefaultDay,
+			expectState({
+				activeDate: defaultDate,
+				bookingsByDate: { [defaultDate]: bookingsOnDefaultDay },
 			})
 		})
 	})
 
 	describe("addBooking", () => {
-		it("stores a booking", async () => {
-			const morning = {
-				id: "morning",
-				date: defaultDate,
-				timeRange: { start: "09:00", end: "09:30" },
-				title: "Morning",
-			} satisfies BookingInfo
+		it("stores a booking after validating against the other bookings of that day", async () => {
 			vi.mocked(tryAddBooking).mockResolvedValue({ valid: true })
-			await load([planning, review])
+			await load({ bookings: [bookingOnMorning] }).unwrap()
 
-			await expect(
-				store.dispatch(addBooking(morning)).unwrap()
-			).resolves.toEqual({ valid: true })
+			await store.dispatch(addBooking(bookingOnLunch)).unwrap()
 
 			expect(tryAddBooking).toHaveBeenCalledExactlyOnceWith({
-				booking: morning,
-				otherBookings: [planning, review],
+				booking: bookingOnLunch,
+				otherBookings: [bookingOnMorning],
 				today,
 				currentTime,
 			})
-			expect(sortBookings).toHaveBeenCalledTimes(2)
-			expect(store.getState().bookings?.bookings).toHaveLength(3)
-			expect(store.getState().bookings?.bookings).toEqual(
-				expect.arrayContaining([morning, planning, review])
-			)
+			expectBookingsOf(defaultDate, [bookingOnMorning, bookingOnLunch])
 		})
 
-		it("validates an added booking against the other saved bookings", async () => {
-			const moved = {
-				...planning,
-				timeRange: { start: "16:00", end: "17:00" },
-				title: "Moved",
-			} satisfies BookingInfo
-			vi.mocked(tryAddBooking).mockResolvedValue({ valid: true })
-			await load([planning, review])
-
-			await store.dispatch(addBooking(moved)).unwrap()
-
-			expect(tryAddBooking).toHaveBeenCalledExactlyOnceWith({
-				booking: moved,
-				otherBookings: [review],
-				today,
-				currentTime,
-			})
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: [planning, review, moved],
-			})
-		})
-
-		it("does not store a booking before a day is loaded", async () => {
-			vi.mocked(tryAddBooking).mockResolvedValue({ valid: true })
-
-			await expect(
-				store.dispatch(addBooking(planning)).unwrap()
-			).resolves.toEqual({ valid: true })
-
-			expect(tryAddBooking).toHaveBeenCalledExactlyOnceWith({
-				booking: planning,
-				otherBookings: [],
-				today,
-				currentTime,
-			})
-			expect(store.getState().bookings).toBeNull()
-		})
-
-		it("does not store a booking for a different day", async () => {
-			const bookingOnOtherDay = {
-				...makeBookingOnDate(planning, otherDate),
-				id: "other-day",
+		it("excludes the booking id from the other bookings used for validation", async () => {
+			const bookingWithExistingId = {
+				...bookingOnEvening,
+				id: bookingOnLunch.id,
 			}
 			vi.mocked(tryAddBooking).mockResolvedValue({ valid: true })
-			await load(bookingsOnDefaultDay)
+			await load({ bookings: [bookingOnMorning, bookingOnLunch] }).unwrap()
+
+			await store.dispatch(addBooking(bookingWithExistingId)).unwrap()
+
+			expect(tryAddBooking).toHaveBeenCalledExactlyOnceWith({
+				booking: bookingWithExistingId,
+				otherBookings: [bookingOnMorning],
+				today,
+				currentTime,
+			})
+		})
+
+		it("loads the day before validating when it is not stored yet", async () => {
+			vi.mocked(getBookings).mockResolvedValueOnce([bookingOnLunch])
+			vi.mocked(tryAddBooking).mockResolvedValue({ valid: true })
+
+			await store.dispatch(addBooking(bookingOnMorning)).unwrap()
+
+			expect(getBookings).toHaveBeenCalledExactlyOnceWith(defaultDate)
+			expect(tryAddBooking).toHaveBeenCalledExactlyOnceWith({
+				booking: bookingOnMorning,
+				otherBookings: [bookingOnLunch],
+				today,
+				currentTime,
+			})
+			expectActiveDate(today)
+			expectBookingsOf(defaultDate, [bookingOnMorning, bookingOnLunch])
+		})
+
+		it("stores a booking for another day without activating it", async () => {
+			const bookingOnOtherDay = makeBookingOnDate(bookingOnLunch, otherDate)
+			vi.mocked(tryAddBooking).mockResolvedValue({ valid: true })
+			await load({ bookings: bookingsOnDefaultDay, setDay: true }).unwrap()
+			vi.mocked(getBookings).mockResolvedValueOnce([])
+
+			await store.dispatch(addBooking(bookingOnOtherDay)).unwrap()
+
+			expectActiveDate(defaultDate)
+			expectBookingsOf(otherDate, [bookingOnOtherDay])
+		})
+
+		it("rejects without validating when the day cannot be loaded", async () => {
+			vi.mocked(getBookings).mockRejectedValueOnce(new Error("offline"))
 
 			await expect(
-				store.dispatch(addBooking(bookingOnOtherDay)).unwrap()
-			).resolves.toEqual({ valid: true })
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: bookingsOnDefaultDay,
-			})
+				store.dispatch(addBooking(bookingOnMorning)).unwrap()
+			).rejects.toBe("Bookings not found")
+			expect(tryAddBooking).not.toHaveBeenCalled()
 		})
 
 		it("rejects validation errors and keeps the loaded bookings", async () => {
@@ -251,108 +379,79 @@ describe("bookingsSlice", () => {
 				valid: false,
 				errors: validationErrors,
 			})
-			await load(bookingsOnDefaultDay)
+			await load({ bookings: bookingsOnDefaultDay }).unwrap()
 
-			await expect(store.dispatch(addBooking(review)).unwrap()).rejects.toEqual(
-				validationErrors
-			)
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: bookingsOnDefaultDay,
-			})
+			await expect(
+				store.dispatch(addBooking(bookingOnLunch)).unwrap()
+			).rejects.toEqual(validationErrors)
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
 		})
 
 		it("rejects when adding a booking fails", async () => {
 			vi.mocked(tryAddBooking).mockRejectedValueOnce(new Error("offline"))
-			await load(bookingsOnDefaultDay)
+			await load({ bookings: bookingsOnDefaultDay }).unwrap()
 
-			await expect(store.dispatch(addBooking(review)).unwrap()).rejects.toBe(
-				"Failed to add booking"
-			)
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: bookingsOnDefaultDay,
-			})
+			await expect(
+				store.dispatch(addBooking(bookingOnLunch)).unwrap()
+			).rejects.toBe("Failed to add booking")
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
 		})
 	})
 
 	describe("updateBooking", () => {
-		it("updates a booking", async () => {
-			const updatedBooking = {
-				...planning,
-				timeRange: { start: "16:00", end: "17:00" },
-				title: "Updated",
-			} satisfies BookingInfo
+		it("updates a booking on the active day", async () => {
+			const updatedLunch = {
+				...bookingOnLunch,
+				timeRange: bookingOnEvening.timeRange,
+				title: bookingOnEvening.title,
+			}
 			vi.mocked(tryUpdateBooking).mockResolvedValue({ valid: true })
-			await load([planning, review])
+			await load({
+				bookings: [bookingOnMorning, bookingOnLunch],
+				setDay: true,
+			}).unwrap()
 
-			await expect(
-				store.dispatch(updateBooking(updatedBooking)).unwrap()
-			).resolves.toEqual({ valid: true })
+			await store.dispatch(updateBooking(updatedLunch)).unwrap()
 
 			expect(tryUpdateBooking).toHaveBeenCalledExactlyOnceWith({
-				booking: updatedBooking,
-				otherBookings: [review],
+				booking: updatedLunch,
+				otherBookings: [bookingOnMorning],
 			})
-			expect(sortBookings).toHaveBeenCalledTimes(2)
-			expect(store.getState().bookings?.bookings).toHaveLength(2)
-			expect(store.getState().bookings?.bookings).toEqual(
-				expect.arrayContaining([updatedBooking, review])
+			expectBookingsOf(defaultDate, [bookingOnMorning, updatedLunch])
+		})
+
+		it("moves a booking to another day and keeps the active day", async () => {
+			const bookingOnMorningMoved = makeBookingOnDate(
+				bookingOnMorning,
+				otherDate
 			)
-		})
-
-		it("does not update a booking before a day is loaded", async () => {
+			const bookingOnLunchMoved = makeBookingOnDate(bookingOnLunch, otherDate)
 			vi.mocked(tryUpdateBooking).mockResolvedValue({ valid: true })
-			await expect(
-				store.dispatch(updateBooking(planning)).unwrap()
-			).resolves.toEqual({ valid: true })
+			await load({
+				bookings: [bookingOnMorning, bookingOnLunch],
+				setDay: true,
+			}).unwrap()
+			vi.mocked(getBookings).mockResolvedValueOnce([bookingOnLunchMoved])
 
+			await store.dispatch(updateBooking(bookingOnMorningMoved)).unwrap()
+
+			expect(getBookings).toHaveBeenLastCalledWith(otherDate)
 			expect(tryUpdateBooking).toHaveBeenCalledExactlyOnceWith({
-				booking: planning,
-				otherBookings: [],
+				booking: bookingOnMorningMoved,
+				otherBookings: [bookingOnLunchMoved],
 			})
-			expect(store.getState().bookings).toBeNull()
+			expectActiveDate(defaultDate)
+			expectBookingsOf(defaultDate, [bookingOnLunch])
+			expectBookingsOf(otherDate, [bookingOnMorningMoved, bookingOnLunchMoved])
 		})
 
-		it("does not update a booking for a different day", async () => {
-			const updatedBooking = {
-				...planning,
-				date: otherDate,
-				title: "Elsewhere",
-			} satisfies BookingInfo
-			vi.mocked(tryUpdateBooking).mockResolvedValue({ valid: true })
-			await load([planning, review])
+		it("rejects without validating when the day cannot be loaded", async () => {
+			vi.mocked(getBookings).mockRejectedValueOnce(new Error("offline"))
 
 			await expect(
-				store.dispatch(updateBooking(updatedBooking)).unwrap()
-			).resolves.toEqual({ valid: true })
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: [planning, review],
-			})
-		})
-
-		it("does not update a booking that is not loaded", async () => {
-			const missing = {
-				...planning,
-				id: "missing",
-				title: "Missing",
-			} satisfies BookingInfo
-			vi.mocked(tryUpdateBooking).mockResolvedValue({ valid: true })
-			await load([planning, review])
-
-			await expect(
-				store.dispatch(updateBooking(missing)).unwrap()
-			).resolves.toEqual({ valid: true })
-
-			expect(tryUpdateBooking).toHaveBeenCalledExactlyOnceWith({
-				booking: missing,
-				otherBookings: [planning, review],
-			})
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: [planning, review],
-			})
+				store.dispatch(updateBooking(bookingOnMorning)).unwrap()
+			).rejects.toBe("Bookings not found")
+			expect(tryUpdateBooking).not.toHaveBeenCalled()
 		})
 
 		it("rejects validation errors and keeps the loaded bookings", async () => {
@@ -360,82 +459,63 @@ describe("bookingsSlice", () => {
 				valid: false,
 				errors: validationErrors,
 			})
-			await load(bookingsOnDefaultDay)
+			await load({ bookings: bookingsOnDefaultDay }).unwrap()
 
 			await expect(
-				store.dispatch(updateBooking(planning)).unwrap()
+				store.dispatch(updateBooking(bookingOnMorning)).unwrap()
 			).rejects.toEqual(validationErrors)
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: bookingsOnDefaultDay,
-			})
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
 		})
 
 		it("rejects when updating a booking fails", async () => {
 			vi.mocked(tryUpdateBooking).mockRejectedValueOnce(new Error("offline"))
-			await load(bookingsOnDefaultDay)
+			await load({ bookings: bookingsOnDefaultDay }).unwrap()
 
 			await expect(
-				store.dispatch(updateBooking(planning)).unwrap()
+				store.dispatch(updateBooking(bookingOnMorning)).unwrap()
 			).rejects.toBe("Failed to update booking")
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: bookingsOnDefaultDay,
-			})
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
 		})
 	})
 
 	describe("deleteBooking", () => {
-		it("removes a booking from the loaded day", async () => {
+		it("removes a booking from the active day", async () => {
 			vi.mocked(tryDeleteBooking).mockResolvedValue({ valid: true })
-			await load([planning, review])
+			await load({
+				bookings: [bookingOnMorning, bookingOnLunch],
+				setDay: true,
+			}).unwrap()
 
-			await expect(
-				store.dispatch(deleteBooking(planning.id)).unwrap()
-			).resolves.toEqual({ valid: true })
+			await store.dispatch(deleteBooking(bookingOnMorning.id)).unwrap()
 
-			expect(tryDeleteBooking).toHaveBeenCalledExactlyOnceWith(planning.id)
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: [review],
-			})
+			expect(tryDeleteBooking).toHaveBeenCalledExactlyOnceWith(
+				bookingOnMorning.id
+			)
+			expectBookingsOf(defaultDate, [bookingOnLunch])
 		})
 
 		it("does not remove a booking before a day is loaded", async () => {
 			vi.mocked(tryDeleteBooking).mockResolvedValue({ valid: true })
-			await expect(
-				store.dispatch(deleteBooking(planning.id)).unwrap()
-			).resolves.toEqual({ valid: true })
 
-			expect(tryDeleteBooking).toHaveBeenCalledExactlyOnceWith(planning.id)
-			expect(store.getState().bookings).toBeNull()
+			await store.dispatch(deleteBooking(bookingOnMorning.id)).unwrap()
+
+			expectState(null)
 		})
 
-		it("does not remove a booking that is not loaded", async () => {
+		it("does not remove a booking that is not on the active day", async () => {
+			const bookingOnOtherDay = makeBookingOnDate(bookingOnLunch, otherDate)
 			vi.mocked(tryDeleteBooking).mockResolvedValue({ valid: true })
-			await load(bookingsOnDefaultDay)
-
-			await expect(
-				store.dispatch(deleteBooking("missing")).unwrap()
-			).resolves.toEqual({ valid: true })
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: bookingsOnDefaultDay,
-			})
-		})
-
-		it("does not remove a booking from a different day", async () => {
-			const bookingOnOtherDay = makeBookingOnDate(planning, otherDate)
-			vi.mocked(tryDeleteBooking).mockResolvedValue({ valid: true })
-			await load([bookingOnOtherDay])
-
-			await expect(
-				store.dispatch(deleteBooking(bookingOnOtherDay.id)).unwrap()
-			).resolves.toEqual({ valid: true })
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
+			await load({ bookings: bookingsOnDefaultDay, setDay: true }).unwrap()
+			await load({
 				bookings: [bookingOnOtherDay],
-			})
+				date: otherDate,
+			}).unwrap()
+
+			await store.dispatch(deleteBooking("missing")).unwrap()
+			await store.dispatch(deleteBooking(bookingOnOtherDay.id)).unwrap()
+
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
+			expectBookingsOf(otherDate, [bookingOnOtherDay])
 		})
 
 		it("rejects validation errors and keeps the loaded bookings", async () => {
@@ -443,59 +523,49 @@ describe("bookingsSlice", () => {
 				valid: false,
 				errors: ["Booking was not found"],
 			})
-			await load(bookingsOnDefaultDay)
+			await load({ bookings: bookingsOnDefaultDay }).unwrap()
 
 			await expect(
-				store.dispatch(deleteBooking(planning.id)).unwrap()
+				store.dispatch(deleteBooking(bookingOnMorning.id)).unwrap()
 			).rejects.toEqual(["Booking was not found"])
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: bookingsOnDefaultDay,
-			})
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
 		})
 
 		it("rejects when deleting a booking fails", async () => {
 			vi.mocked(tryDeleteBooking).mockRejectedValueOnce(new Error("offline"))
-			await load(bookingsOnDefaultDay)
+			await load({ bookings: bookingsOnDefaultDay }).unwrap()
 
 			await expect(
-				store.dispatch(deleteBooking(planning.id)).unwrap()
+				store.dispatch(deleteBooking(bookingOnMorning.id)).unwrap()
 			).rejects.toBe("Failed to delete booking")
-			expect(store.getState().bookings).toEqual({
-				date: defaultDate,
-				bookings: bookingsOnDefaultDay,
-			})
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
 		})
 	})
 
 	describe("selectors", () => {
-		it("falls back to default values before data is loaded", () => {
-			const state = store.getState()
+		it("falls back before data is loaded and reads by day after", async () => {
+			expectActiveDate(today)
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBeNull()
+			expect(
+				selectBookingById(store.getState(), defaultDate, bookingOnMorning.id)
+			).toBeNull()
 
-			expect(selectDate(state)).toBe(today)
-			expect(selectAllBookings(state)).toBeNull()
-			expect(selectAllBookingsExcept(state, planning.id)).toEqual([])
-			expect(selectBookingById(state, planning.id)).toBeNull()
-		})
+			const bookingOnOtherDay = makeBookingOnDate(bookingOnLunch, otherDate)
+			await load({
+				bookings: [bookingOnOtherDay],
+				date: otherDate,
+				setDay: true,
+			}).unwrap()
 
-		it("returns the loaded day and its bookings", async () => {
-			const bookingOnOtherDayPlanning = makeBookingOnDate(planning, otherDate)
-			const bookingOnOtherDayReview = makeBookingOnDate(review, otherDate)
-			await load([bookingOnOtherDayPlanning, bookingOnOtherDayReview], otherDate)
-			const state = store.getState()
-
-			expect(selectDate(state)).toBe(otherDate)
-			expect(selectAllBookings(state)).toEqual([
-				bookingOnOtherDayPlanning,
-				bookingOnOtherDayReview,
-			])
-			expect(selectAllBookingsExcept(state, bookingOnOtherDayPlanning.id)).toEqual([
-				bookingOnOtherDayReview,
-			])
-			expect(selectBookingById(state, bookingOnOtherDayReview.id)).toEqual(
-				bookingOnOtherDayReview
-			)
-			expect(selectBookingById(state, "missing")).toBeNull()
+			expectActiveDate(otherDate)
+			expectBookingsOf(otherDate, [bookingOnOtherDay])
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBeNull()
+			expect(
+				selectBookingById(store.getState(), otherDate, bookingOnOtherDay.id)
+			).toEqual(bookingOnOtherDay)
+			expect(
+				selectBookingById(store.getState(), otherDate, "missing")
+			).toBeNull()
 		})
 	})
 })

@@ -6,9 +6,9 @@ import { getToday } from "../../domain/date"
 import {
 	addBooking,
 	deleteBooking,
-	loadBookings,
-	selectAllBookings,
-	selectDate,
+	loadBookingsForDay,
+	selectActiveDate,
+	selectBookingsByDay,
 	updateBooking,
 } from "../../store/bookingsSlice"
 import type { BookingInfo, YearMonthDay } from "../../types/types"
@@ -21,8 +21,8 @@ import { useAppDispatch, useAppSelector } from "../hooks/store"
 export function PageBooking() {
 	const today = getToday()
 	const dispatch = useAppDispatch()
-	const date = useAppSelector(selectDate)
-	const bookings = useAppSelector(selectAllBookings)
+	const date = useAppSelector(selectActiveDate)
+	const bookings = useAppSelector((state) => selectBookingsByDay(state, date))
 	const [isError, setError] = useState<boolean>(false)
 	const [isModalFormOpen, setIsModalFormOpen] = useState(false)
 	const [bookingInfo, setBookingInfo] = useState<BookingInfo | undefined>(
@@ -75,7 +75,9 @@ export function PageBooking() {
 
 	const onDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const newDate = event.target.value ?? today
-		dispatch(loadBookings({ date: newDate as YearMonthDay }))
+		dispatch(
+			loadBookingsForDay({ date: newDate as YearMonthDay, setDay: true })
+		)
 			.unwrap()
 			.catch(() => setError(true))
 	}
@@ -85,7 +87,7 @@ export function PageBooking() {
 			return
 		}
 
-		const request = dispatch(loadBookings({ date }))
+		const request = dispatch(loadBookingsForDay({ date, setDay: true }))
 		request.unwrap().catch((error: unknown) => {
 			if (
 				typeof error === "object" &&

@@ -41,6 +41,13 @@ export function sortBookings(bookings: Array<BookingInfo>): Array<BookingInfo> {
 	})
 }
 
+export function excludeBooking(
+	bookings: Array<BookingInfo>,
+	id: BookingInfo["id"]
+): Array<BookingInfo> {
+	return [...bookings].filter((booking) => booking.id !== id)
+}
+
 export async function tryAddBooking({
 	booking,
 	otherBookings,

@@ -1,6 +1,7 @@
 import { getBookingsFromServer } from "../services/serverAdapter"
 import type { BookingInfo, HourMinute, YearMonthDay } from "../types/types"
 import {
+	excludeBooking,
 	sortBookings,
 	tryAddBooking,
 	tryDeleteBooking,
@@ -122,6 +123,46 @@ describe("bookings server errors", () => {
 			expect(sortedBookings).not.toBe(bookings)
 		}
 	)
+
+	describe("excludeBooking", () => {
+		const morning = {
+			id: "morning",
+			date: "2026-12-01",
+			timeRange: { start: "09:00", end: "10:00" },
+			title: "Morning",
+		} satisfies BookingInfo
+
+		const afternoon = {
+			id: "afternoon",
+			date: "2026-12-01",
+			timeRange: { start: "14:00", end: "15:00" },
+			title: "Afternoon",
+		} satisfies BookingInfo
+
+		it("removes the booking with the given id", () => {
+			const bookings = [morning, afternoon]
+
+			expect(excludeBooking(bookings, morning.id)).toEqual([afternoon])
+		})
+
+		it("returns the same bookings when the id is not found", () => {
+			const bookings = [morning, afternoon]
+
+			expect(excludeBooking(bookings, "missing")).toEqual(bookings)
+		})
+
+		it("returns an empty list when the only booking matches", () => {
+			expect(excludeBooking([morning], morning.id)).toEqual([])
+		})
+
+		it("does not mutate the original list", () => {
+			const bookings = [morning, afternoon]
+			const excluded = excludeBooking(bookings, morning.id)
+
+			expect(excluded).not.toBe(bookings)
+			expect(bookings).toEqual([morning, afternoon])
+		})
+	})
 
 	it("does not add a booking when the server rejects it", async () => {
 		const created = await tryAddBooking({
