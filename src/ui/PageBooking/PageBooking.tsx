@@ -79,6 +79,7 @@ export function PageBooking() {
 			loadBookingsForDay({ date: newDate as YearMonthDay, setDay: true })
 		)
 			.unwrap()
+			.then(() => setError(false))
 			.catch(() => setError(true))
 	}
 
@@ -88,18 +89,21 @@ export function PageBooking() {
 		}
 
 		const request = dispatch(loadBookingsForDay({ date, setDay: true }))
-		request.unwrap().catch((error: unknown) => {
-			if (
-				typeof error === "object" &&
-				error !== null &&
-				"name" in error &&
-				error.name === "AbortError"
-			) {
-				return
-			}
+		request
+			.unwrap()
+			.then(() => setError(false))
+			.catch((error: unknown) => {
+				if (
+					typeof error === "object" &&
+					error !== null &&
+					"name" in error &&
+					error.name === "AbortError"
+				) {
+					return
+				}
 
-			setError(true)
-		})
+				setError(true)
+			})
 
 		return () => {
 			request.abort()
