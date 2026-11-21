@@ -28,18 +28,14 @@ export type BookingsState = {
 const initialState = null as BookingsState
 
 const mapOfLoads = new Map<YearMonthDay, Promise<Array<BookingInfo>>>()
-let lastRequestedDateToActivate: YearMonthDay | null = null
 
 export const loadBookingsForDay = createAsyncThunk<
 	Array<BookingInfo>,
-	{ date: YearMonthDay; setDay: boolean },
+	YearMonthDay,
 	{ state: RootState; rejectValue: string }
 >(
-	"bookings/loadBookings",
-	async ({ date, setDay }, { getState, dispatch, rejectWithValue, signal }) => {
-		if (setDay) {
-			lastRequestedDateToActivate = date
-		}
+	"bookings/loadBookingsForDay",
+	async (date, { getState, dispatch, rejectWithValue, signal }) => {
 		try {
 			const bookings = await (async function () {
 				const storedBookings = selectBookingsByDay(getState(), date)
@@ -60,27 +56,16 @@ export const loadBookingsForDay = createAsyncThunk<
 			})()
 
 			if (!signal.aborted) {
-				const isRequestedDateToActivate =
-					setDay && lastRequestedDateToActivate === date
 				dispatch(
-					bookingsSlice.actions.setBookings({
+					bookingsSlice.actions.setBookingsForDate({
 						date,
 						bookings,
-						setDay: isRequestedDateToActivate,
 					})
 				)
-				if (isRequestedDateToActivate) {
-					lastRequestedDateToActivate = null
-				}
 			}
 			return bookings
 		} catch (_) {
 			mapOfLoads.delete(date)
-			const isRequestedDateToActivate =
-				setDay && lastRequestedDateToActivate === date
-			if (isRequestedDateToActivate) {
-				lastRequestedDateToActivate = null
-			}
 			return rejectWithValue("Failed to load bookings")
 		}
 	}
@@ -95,7 +80,7 @@ export const addBooking = createAsyncThunk<
 	async (booking, { dispatch, rejectWithValue, getState }) => {
 		let bookingsOfDate = selectBookingsByDay(getState(), booking.date)
 		if (bookingsOfDate === null) {
-			await dispatch(loadBookingsForDay({ date: booking.date, setDay: false }))
+			await dispatch(loadBookingsForDay(booking.date))
 			bookingsOfDate = selectBookingsByDay(getState(), booking.date)
 			if (bookingsOfDate === null) {
 				return rejectWithValue("Bookings not found")
@@ -129,7 +114,7 @@ export const updateBooking = createAsyncThunk<
 	async (booking, { dispatch, rejectWithValue, getState }) => {
 		let bookingsOfDate = selectBookingsByDay(getState(), booking.date)
 		if (bookingsOfDate === null) {
-			await dispatch(loadBookingsForDay({ date: booking.date, setDay: false }))
+			await dispatch(loadBookingsForDay(booking.date))
 			bookingsOfDate = selectBookingsByDay(getState(), booking.date)
 			if (bookingsOfDate === null) {
 				return rejectWithValue("Bookings not found")
@@ -173,15 +158,27 @@ const bookingsSlice = createSlice({
 	name: "bookings",
 	initialState,
 	reducers: {
-		setBookings: (
+		activateDate: (
+			state: BookingsState,
+			action: PayloadAction<YearMonthDay>
+		) => {
+			if (state === null) {
+				return {
+					activeDate: action.payload,
+					bookingsByDate: {},
+				}
+			}
+			state.activeDate = action.payload
+		},
+
+		setBookingsForDate: (
 			state: BookingsState,
 			action: PayloadAction<{
 				date: YearMonthDay
 				bookings: Array<BookingInfo>
-				setDay: boolean
 			}>
 		) => {
-			const { date, bookings, setDay } = action.payload
+			const { date, bookings } = action.payload
 			const sortedBookings = sortBookings(bookings)
 			if (state === null) {
 				const bookingsByDate: Partial<
@@ -189,15 +186,12 @@ const bookingsSlice = createSlice({
 				> = {}
 				bookingsByDate[date] = sortedBookings
 				return {
-					activeDate: setDay ? date : getToday(),
+					activeDate: getToday(),
 					bookingsByDate,
 				}
 			}
-			if (setDay) {
-				state.activeDate = date
-			}
+
 			state.bookingsByDate[date] = sortedBookings
-			return state
 		},
 
 		addBooking: (state: BookingsState, action: PayloadAction<BookingInfo>) => {
@@ -267,7 +261,6 @@ const bookingsSlice = createSlice({
 
 		reset: () => {
 			mapOfLoads.clear()
-			lastRequestedDateToActivate = null
 			return initialState
 		},
 	},
@@ -282,6 +275,6 @@ const bookingsSlice = createSlice({
 })
 
 export const bookingsReducer = bookingsSlice.reducer
-export const { reset } = bookingsSlice.actions
+export const { activateDate, reset } = bookingsSlice.actions
 export const { selectActiveDate, selectBookingsByDay, selectBookingById } =
 	bookingsSlice.selectors

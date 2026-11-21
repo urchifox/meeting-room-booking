@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 
 import { getToday } from "../../domain/date"
 import {
+	activateDate,
 	addBooking,
 	deleteBooking,
 	loadBookingsForDay,
@@ -75,12 +76,8 @@ export function PageBooking() {
 
 	const onDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const newDate = event.target.value ?? today
-		dispatch(
-			loadBookingsForDay({ date: newDate as YearMonthDay, setDay: true })
-		)
-			.unwrap()
-			.then(() => setError(false))
-			.catch(() => setError(true))
+		dispatch(activateDate(newDate as YearMonthDay))
+		setError(false)
 	}
 
 	useEffect(() => {
@@ -88,7 +85,7 @@ export function PageBooking() {
 			return
 		}
 
-		const request = dispatch(loadBookingsForDay({ date, setDay: true }))
+		const request = dispatch(loadBookingsForDay(date))
 		request
 			.unwrap()
 			.then(() => setError(false))

@@ -8,6 +8,7 @@ import {
 import type { BookingInfo, YearMonthDay } from "../types/types"
 import {
 	type BookingsState,
+	activateDate,
 	addBooking,
 	deleteBooking,
 	loadBookingsForDay,
@@ -90,8 +91,8 @@ type LoadOptions = {
 	setDay?: boolean
 }
 
-function dispatchLoadBookings(date: YearMonthDay, setDay: boolean) {
-	return store.dispatch(loadBookingsForDay({ date, setDay }))
+function dispatchLoadBookings(date: YearMonthDay) {
+	return store.dispatch(loadBookingsForDay(date))
 }
 
 type LoadResult = ReturnType<typeof dispatchLoadBookings>
@@ -120,7 +121,10 @@ function load({
 	} else if (error !== undefined) {
 		vi.mocked(getBookings).mockRejectedValueOnce(error)
 	}
-	return dispatchLoadBookings(date, setDay)
+	if (setDay) {
+		store.dispatch(activateDate(date))
+	}
+	return dispatchLoadBookings(date)
 }
 
 function createDeferred<T>() {
@@ -187,7 +191,11 @@ describe("bookingsSlice", () => {
 				aborted: true,
 				error: { name: "AbortError" },
 			})
-			expectState(null)
+			expectState({
+				activeDate: defaultDate,
+				bookingsByDate: {},
+			})
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBeNull()
 		})
 
 		it("activates the day when an earlier same-day request was aborted", async () => {
@@ -305,7 +313,11 @@ describe("bookingsSlice", () => {
 			await expect(
 				load({ error: new Error("offline"), setDay: true }).unwrap()
 			).rejects.toBe("Failed to load bookings")
-			expectState(null)
+			expectState({
+				activeDate: defaultDate,
+				bookingsByDate: {},
+			})
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBeNull()
 
 			await load({ bookings: bookingsOnDefaultDay }).unwrap()
 
@@ -313,7 +325,7 @@ describe("bookingsSlice", () => {
 			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
 		})
 
-		it("keeps the loaded state when a later load fails", async () => {
+		it("keeps cached bookings when a later activated day fails to load", async () => {
 			await load({ bookings: bookingsOnDefaultDay, setDay: true }).unwrap()
 
 			await expect(
@@ -324,9 +336,10 @@ describe("bookingsSlice", () => {
 				}).unwrap()
 			).rejects.toBe("Failed to load bookings")
 			expectState({
-				activeDate: defaultDate,
+				activeDate: otherDate,
 				bookingsByDate: { [defaultDate]: bookingsOnDefaultDay },
 			})
+			expect(selectBookingsByDay(store.getState(), otherDate)).toBeNull()
 		})
 	})
 
