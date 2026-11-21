@@ -494,28 +494,33 @@ describe("bookingsSlice", () => {
 			expectBookingsOf(defaultDate, [bookingOnLunch])
 		})
 
+		it("removes a booking from another day", async () => {
+			vi.mocked(tryDeleteBooking).mockResolvedValue({ valid: true })
+			await load({
+				bookings: bookingsOnDefaultDay,
+				setDay: true,
+			}).unwrap()
+			const bookingOnOtherDay = makeBookingOnDate(bookingOnEvening, otherDate)
+			await load({
+				bookings: [bookingOnOtherDay],
+				date: otherDate,
+			}).unwrap()
+
+			await store.dispatch(deleteBooking(bookingOnOtherDay.id)).unwrap()
+
+			expect(tryDeleteBooking).toHaveBeenCalledExactlyOnceWith(
+				bookingOnOtherDay.id
+			)
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
+			expectBookingsOf(otherDate, [])
+		})
+
 		it("does not remove a booking before a day is loaded", async () => {
 			vi.mocked(tryDeleteBooking).mockResolvedValue({ valid: true })
 
 			await store.dispatch(deleteBooking(bookingOnMorning.id)).unwrap()
 
 			expectState(null)
-		})
-
-		it("does not remove a booking that is not on the active day", async () => {
-			const bookingOnOtherDay = makeBookingOnDate(bookingOnLunch, otherDate)
-			vi.mocked(tryDeleteBooking).mockResolvedValue({ valid: true })
-			await load({ bookings: bookingsOnDefaultDay, setDay: true }).unwrap()
-			await load({
-				bookings: [bookingOnOtherDay],
-				date: otherDate,
-			}).unwrap()
-
-			await store.dispatch(deleteBooking("missing")).unwrap()
-			await store.dispatch(deleteBooking(bookingOnOtherDay.id)).unwrap()
-
-			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
-			expectBookingsOf(otherDate, [bookingOnOtherDay])
 		})
 
 		it("rejects validation errors and keeps the loaded bookings", async () => {

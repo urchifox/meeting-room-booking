@@ -245,17 +245,20 @@ const bookingsSlice = createSlice({
 			if (state === null) {
 				return
 			}
-			const bookingsOfActiveDay = state.bookingsByDate[state.activeDate]
-			if (bookingsOfActiveDay === undefined) {
-				return
-			}
+
 			const id = action.payload
-			const booking = bookingsOfActiveDay?.find((item) => item.id === id)
-			if (booking === undefined) {
+			const allBookings = Object.values(state.bookingsByDate).flat()
+			const requestedBooking = allBookings.find((item) => item?.id === id)
+			if (requestedBooking === undefined) {
 				return
 			}
-			state.bookingsByDate[state.activeDate] = excludeBooking(
-				bookingsOfActiveDay,
+
+			const bookingsOfDate = state.bookingsByDate[requestedBooking.date]
+			if (bookingsOfDate === undefined) {
+				return
+			}
+			state.bookingsByDate[requestedBooking.date] = excludeBooking(
+				bookingsOfDate,
 				id
 			)
 		},
