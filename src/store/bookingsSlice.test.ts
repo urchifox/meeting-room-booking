@@ -190,6 +190,34 @@ describe("bookingsSlice", () => {
 			expectState(null)
 		})
 
+		it("activates the day when an earlier same-day request was aborted", async () => {
+			const bookingsOnOtherDay = [makeBookingOnDate(bookingOnLunch, otherDate)]
+			await load({ bookings: bookingsOnDefaultDay, setDay: true }).unwrap()
+
+			const { promise, resolve } = createDeferred<Array<BookingInfo>>()
+			const first = load({
+				promise,
+				date: otherDate,
+				setDay: true,
+			})
+			const second = load({
+				date: otherDate,
+				setDay: true,
+			})
+
+			first.abort()
+			resolve(bookingsOnOtherDay)
+
+			await expect(first.unwrap()).rejects.toMatchObject({
+				name: "AbortError",
+			})
+			await second.unwrap()
+
+			expect(getBookings).toHaveBeenCalledTimes(2)
+			expectActiveDate(otherDate)
+			expectBookingsOf(otherDate, bookingsOnOtherDay)
+		})
+
 		it("keeps earlier days and activates the newly requested day", async () => {
 			const bookingsOnOtherDay = [makeBookingOnDate(bookingOnLunch, otherDate)]
 			await load({ bookings: bookingsOnDefaultDay, setDay: true }).unwrap()

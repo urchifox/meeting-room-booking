@@ -59,8 +59,9 @@ export const loadBookingsForDay = createAsyncThunk<
 				return newBookings
 			})()
 
-			const isRequestedDateToActivate = lastRequestedDateToActivate === date
 			if (!signal.aborted) {
+				const isRequestedDateToActivate =
+					setDay && lastRequestedDateToActivate === date
 				dispatch(
 					bookingsSlice.actions.setBookings({
 						date,
@@ -68,14 +69,15 @@ export const loadBookingsForDay = createAsyncThunk<
 						setDay: isRequestedDateToActivate,
 					})
 				)
-			}
-			if (isRequestedDateToActivate) {
-				lastRequestedDateToActivate = null
+				if (isRequestedDateToActivate) {
+					lastRequestedDateToActivate = null
+				}
 			}
 			return bookings
 		} catch (_) {
 			mapOfLoads.delete(date)
-			const isRequestedDateToActivate = lastRequestedDateToActivate === date
+			const isRequestedDateToActivate =
+				setDay && lastRequestedDateToActivate === date
 			if (isRequestedDateToActivate) {
 				lastRequestedDateToActivate = null
 			}
