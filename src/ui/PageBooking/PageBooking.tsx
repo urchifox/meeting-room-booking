@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 
 import { getToday } from "../../domain/date"
 import {
+	BookingsStatus,
 	activateDate,
 	addBooking,
 	deleteBooking,
@@ -24,7 +25,6 @@ export function PageBooking() {
 	const dispatch = useAppDispatch()
 	const date = useAppSelector(selectActiveDate)
 	const bookings = useAppSelector((state) => selectBookingsByDay(state, date))
-	const [isError, setError] = useState<boolean>(false)
 	const [isModalFormOpen, setIsModalFormOpen] = useState(false)
 	const [bookingInfo, setBookingInfo] = useState<BookingInfo | undefined>(
 		undefined
@@ -77,7 +77,6 @@ export function PageBooking() {
 	const onDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const newDate = event.target.value ?? today
 		dispatch(activateDate(newDate as YearMonthDay))
-		setError(false)
 	}
 
 	useEffect(() => {
@@ -86,21 +85,7 @@ export function PageBooking() {
 		}
 
 		const request = dispatch(loadBookingsForDay(date))
-		request
-			.unwrap()
-			.then(() => setError(false))
-			.catch((error: unknown) => {
-				if (
-					typeof error === "object" &&
-					error !== null &&
-					"name" in error &&
-					error.name === "AbortError"
-				) {
-					return
-				}
-
-				setError(true)
-			})
+		void request.unwrap().catch(() => {})
 
 		return () => {
 			request.abort()
@@ -119,9 +104,11 @@ export function PageBooking() {
 				value={date}
 				onChange={onDateChange}
 			/>
-			{bookings === null && <p>Loading...</p>}
-			{isError && <p>Error loading bookings</p>}
-			{bookings !== null && (
+			{(bookings === null || bookings === BookingsStatus.LOADING) && (
+				<p>Loading...</p>
+			)}
+			{bookings === BookingsStatus.ERROR && <p>Error loading bookings</p>}
+			{Array.isArray(bookings) && (
 				<BookingsList
 					bookings={bookings}
 					onDeleteClick={onDeleteClick}

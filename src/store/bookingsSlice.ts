@@ -1,5 +1,7 @@
 import {
 	type PayloadAction,
+	type ThunkDispatch,
+	type UnknownAction,
 	createAsyncThunk,
 	createSlice,
 } from "@reduxjs/toolkit"
@@ -22,8 +24,17 @@ import type {
 
 export type BookingsState = {
 	activeDate: YearMonthDay
-	bookingsByDate: Partial<Record<YearMonthDay, Array<BookingInfo>>>
+	bookingsByDate: BookingsByDate
 } | null
+
+type BookingsByDate = Partial<
+	Record<YearMonthDay, Array<BookingInfo> | BookingsStatus>
+>
+
+export enum BookingsStatus {
+	LOADING = "LOADING",
+	ERROR = "ERROR",
+}
 
 const initialState = null as BookingsState
 
@@ -36,10 +47,20 @@ export const loadBookingsForDay = createAsyncThunk<
 >(
 	"bookings/loadBookingsForDay",
 	async (date, { getState, dispatch, rejectWithValue, signal }) => {
+		const onFulfilled = (result: Array<BookingInfo> | BookingsStatus) => {
+			onLoadFulfilled({
+				result,
+				date,
+				dispatch,
+				getState,
+				aborted: signal.aborted,
+			})
+		}
+
 		try {
 			const bookings = await (async function () {
 				const storedBookings = selectBookingsByDay(getState(), date)
-				if (storedBookings !== null) {
+				if (Array.isArray(storedBookings)) {
 					return storedBookings
 				}
 
@@ -48,6 +69,13 @@ export const loadBookingsForDay = createAsyncThunk<
 					return await existedPromise
 				}
 
+				dispatch(
+					bookingsSlice.actions.setBookingsForDate({
+						date,
+						bookings: BookingsStatus.LOADING,
+					})
+				)
+
 				const newPromise = getBookings(date)
 				mapOfLoads.set(date, newPromise)
 				const newBookings = await newPromise
@@ -55,21 +83,42 @@ export const loadBookingsForDay = createAsyncThunk<
 				return newBookings
 			})()
 
-			if (!signal.aborted) {
-				dispatch(
-					bookingsSlice.actions.setBookingsForDate({
-						date,
-						bookings,
-					})
-				)
-			}
+			onFulfilled(bookings)
 			return bookings
 		} catch (_) {
 			mapOfLoads.delete(date)
+			onFulfilled(BookingsStatus.ERROR)
 			return rejectWithValue("Failed to load bookings")
 		}
 	}
 )
+
+function onLoadFulfilled({
+	result,
+	date,
+	dispatch,
+	getState,
+	aborted,
+}: {
+	result: Array<BookingInfo> | BookingsStatus
+	date: YearMonthDay
+	dispatch: ThunkDispatch<RootState, unknown, UnknownAction>
+	getState: () => RootState
+	aborted: boolean
+}) {
+	if (aborted) {
+		if (selectBookingsByDay(getState(), date) === BookingsStatus.LOADING) {
+			dispatch(bookingsSlice.actions.removeBookingsForDate(date))
+		}
+	} else {
+		dispatch(
+			bookingsSlice.actions.setBookingsForDate({
+				date,
+				bookings: result,
+			})
+		)
+	}
+}
 
 export const addBooking = createAsyncThunk<
 	ValidationResult,
@@ -78,15 +127,15 @@ export const addBooking = createAsyncThunk<
 >(
 	"bookings/addBooking",
 	async (booking, { dispatch, rejectWithValue, getState }) => {
-		let bookingsOfDate = selectBookingsByDay(getState(), booking.date)
-		if (bookingsOfDate === null) {
-			await dispatch(loadBookingsForDay(booking.date))
-			bookingsOfDate = selectBookingsByDay(getState(), booking.date)
-			if (bookingsOfDate === null) {
-				return rejectWithValue("Bookings not found")
-			}
+		const otherBookings = await getOtherBookings({
+			booking,
+			dispatch,
+			getState,
+		})
+		if (otherBookings === null) {
+			return rejectWithValue("Bookings not found")
 		}
-		const otherBookings = excludeBooking(bookingsOfDate, booking.id)
+
 		try {
 			const result = await tryAddBooking({
 				booking,
@@ -112,15 +161,15 @@ export const updateBooking = createAsyncThunk<
 >(
 	"bookings/updateBooking",
 	async (booking, { dispatch, rejectWithValue, getState }) => {
-		let bookingsOfDate = selectBookingsByDay(getState(), booking.date)
-		if (bookingsOfDate === null) {
-			await dispatch(loadBookingsForDay(booking.date))
-			bookingsOfDate = selectBookingsByDay(getState(), booking.date)
-			if (bookingsOfDate === null) {
-				return rejectWithValue("Bookings not found")
-			}
+		const otherBookings = await getOtherBookings({
+			booking,
+			dispatch,
+			getState,
+		})
+		if (otherBookings === null) {
+			return rejectWithValue("Bookings not found")
 		}
-		const otherBookings = excludeBooking(bookingsOfDate, booking.id)
+
 		try {
 			const result = await tryUpdateBooking({
 				booking,
@@ -136,6 +185,29 @@ export const updateBooking = createAsyncThunk<
 		}
 	}
 )
+
+async function getOtherBookings({
+	booking,
+	dispatch,
+	getState,
+}: {
+	booking: BookingInfo
+	dispatch: ThunkDispatch<RootState, unknown, UnknownAction>
+	getState: () => RootState
+}) {
+	let bookingsOfDate = selectBookingsByDay(getState(), booking.date)
+
+	if (!Array.isArray(bookingsOfDate)) {
+		await dispatch(loadBookingsForDay(booking.date))
+		bookingsOfDate = selectBookingsByDay(getState(), booking.date)
+		if (!Array.isArray(bookingsOfDate)) {
+			return null
+		}
+	}
+
+	const otherBookings = excludeBooking(bookingsOfDate, booking.id)
+	return otherBookings
+}
 
 export const deleteBooking = createAsyncThunk<
 	ValidationResult,
@@ -168,6 +240,14 @@ const bookingsSlice = createSlice({
 					bookingsByDate: {},
 				}
 			}
+			;(Object.keys(state.bookingsByDate) as Array<YearMonthDay>).forEach(
+				(date) => {
+					const bookings = state.bookingsByDate[date]
+					if (bookings === BookingsStatus.ERROR) {
+						delete state.bookingsByDate[date]
+					}
+				}
+			)
 			state.activeDate = action.payload
 		},
 
@@ -175,23 +255,33 @@ const bookingsSlice = createSlice({
 			state: BookingsState,
 			action: PayloadAction<{
 				date: YearMonthDay
-				bookings: Array<BookingInfo>
+				bookings: Array<BookingInfo> | BookingsStatus
 			}>
 		) => {
 			const { date, bookings } = action.payload
-			const sortedBookings = sortBookings(bookings)
+			const valueToSet = Array.isArray(bookings)
+				? sortBookings(bookings)
+				: bookings
 			if (state === null) {
-				const bookingsByDate: Partial<
-					Record<YearMonthDay, Array<BookingInfo>>
-				> = {}
-				bookingsByDate[date] = sortedBookings
+				const bookingsByDate: BookingsByDate = {}
+				bookingsByDate[date] = valueToSet
 				return {
 					activeDate: getToday(),
 					bookingsByDate,
 				}
 			}
 
-			state.bookingsByDate[date] = sortedBookings
+			state.bookingsByDate[date] = valueToSet
+		},
+
+		removeBookingsForDate: (
+			state: BookingsState,
+			action: PayloadAction<YearMonthDay>
+		) => {
+			if (state === null) {
+				return
+			}
+			delete state.bookingsByDate[action.payload]
 		},
 
 		addBooking: (state: BookingsState, action: PayloadAction<BookingInfo>) => {
@@ -200,7 +290,7 @@ const bookingsSlice = createSlice({
 			}
 			const bookingDate = action.payload.date
 			const bookingsOfDate = state.bookingsByDate[bookingDate]
-			if (bookingsOfDate === undefined) {
+			if (!Array.isArray(bookingsOfDate)) {
 				return
 			}
 			bookingsOfDate.push(action.payload)
@@ -219,7 +309,7 @@ const bookingsSlice = createSlice({
 			const updatedDate = booking.date
 
 			const bookingsOfActiveDay = state.bookingsByDate[activeDate]
-			if (bookingsOfActiveDay === undefined) {
+			if (!Array.isArray(bookingsOfActiveDay)) {
 				return
 			}
 			state.bookingsByDate[activeDate] = excludeBooking(
@@ -228,7 +318,7 @@ const bookingsSlice = createSlice({
 			)
 
 			const bookingsOfUpdatedDay = state.bookingsByDate[updatedDate]
-			if (bookingsOfUpdatedDay === undefined) {
+			if (!Array.isArray(bookingsOfUpdatedDay)) {
 				return
 			}
 			state.bookingsByDate[updatedDate] = sortBookings([
@@ -244,13 +334,18 @@ const bookingsSlice = createSlice({
 
 			const id = action.payload
 			const allBookings = Object.values(state.bookingsByDate).flat()
-			const requestedBooking = allBookings.find((item) => item?.id === id)
-			if (requestedBooking === undefined) {
+			const requestedBooking = allBookings.find(
+				(item) => typeof item !== "string" && item?.id === id
+			)
+			if (
+				requestedBooking === undefined ||
+				typeof requestedBooking === "string"
+			) {
 				return
 			}
 
 			const bookingsOfDate = state.bookingsByDate[requestedBooking.date]
-			if (bookingsOfDate === undefined) {
+			if (!Array.isArray(bookingsOfDate)) {
 				return
 			}
 			state.bookingsByDate[requestedBooking.date] = excludeBooking(
@@ -269,8 +364,13 @@ const bookingsSlice = createSlice({
 		selectActiveDate: (state) => state?.activeDate ?? getToday(),
 		selectBookingsByDay: (state, date: YearMonthDay) =>
 			state?.bookingsByDate[date] ?? null,
-		selectBookingById: (state, date: YearMonthDay, id: BookingInfo["id"]) =>
-			state?.bookingsByDate[date]?.find((booking) => booking.id === id) ?? null,
+		selectBookingById: (state, date: YearMonthDay, id: BookingInfo["id"]) => {
+			const bookings = state?.bookingsByDate[date]
+			if (!Array.isArray(bookings)) {
+				return null
+			}
+			return bookings.find((booking) => booking.id === id) ?? null
+		},
 	},
 })
 

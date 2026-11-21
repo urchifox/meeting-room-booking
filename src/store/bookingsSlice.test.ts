@@ -8,6 +8,7 @@ import {
 import type { BookingInfo, YearMonthDay } from "../types/types"
 import {
 	type BookingsState,
+	BookingsStatus,
 	activateDate,
 	addBooking,
 	deleteBooking,
@@ -176,12 +177,30 @@ describe("bookingsSlice", () => {
 			})
 		})
 
-		it("does not store bookings when the request is aborted before it resolves", async () => {
+		it("marks the day as loading while the request is in flight", async () => {
+			const { promise, resolve } = createDeferred<Array<BookingInfo>>()
+			const request = load({ promise, setDay: true })
+
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBe(
+				BookingsStatus.LOADING
+			)
+
+			resolve(bookingsOnDefaultDay)
+			await request.unwrap()
+
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
+		})
+
+		it("clears loading and does not store bookings when the request is aborted", async () => {
 			const { promise, resolve } = createDeferred<Array<BookingInfo>>()
 			const request = load({ promise, setDay: true })
 			const settled = request.unwrap().then(
 				() => ({ aborted: false }),
 				(error) => ({ aborted: true, error })
+			)
+
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBe(
+				BookingsStatus.LOADING
 			)
 
 			request.abort()
@@ -196,6 +215,22 @@ describe("bookingsSlice", () => {
 				bookingsByDate: {},
 			})
 			expect(selectBookingsByDay(store.getState(), defaultDate)).toBeNull()
+		})
+
+		it("does not clear a successful load when an aborted twin finishes later", async () => {
+			const { promise, resolve } = createDeferred<Array<BookingInfo>>()
+			const first = load({ promise, setDay: true })
+			const second = load({})
+
+			first.abort()
+			resolve(bookingsOnDefaultDay)
+
+			await expect(first.unwrap()).rejects.toMatchObject({
+				name: "AbortError",
+			})
+			await second.unwrap()
+
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
 		})
 
 		it("activates the day when an earlier same-day request was aborted", async () => {
@@ -309,15 +344,17 @@ describe("bookingsSlice", () => {
 			expectBookingsOf(otherDate, [])
 		})
 
-		it("rejects and leaves the day unloaded when loading fails", async () => {
+		it("rejects and marks the day as error when loading fails", async () => {
 			await expect(
 				load({ error: new Error("offline"), setDay: true }).unwrap()
 			).rejects.toBe("Failed to load bookings")
 			expectState({
 				activeDate: defaultDate,
-				bookingsByDate: {},
+				bookingsByDate: { [defaultDate]: BookingsStatus.ERROR },
 			})
-			expect(selectBookingsByDay(store.getState(), defaultDate)).toBeNull()
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBe(
+				BookingsStatus.ERROR
+			)
 
 			await load({ bookings: bookingsOnDefaultDay }).unwrap()
 
@@ -337,9 +374,28 @@ describe("bookingsSlice", () => {
 			).rejects.toBe("Failed to load bookings")
 			expectState({
 				activeDate: otherDate,
-				bookingsByDate: { [defaultDate]: bookingsOnDefaultDay },
+				bookingsByDate: {
+					[defaultDate]: bookingsOnDefaultDay,
+					[otherDate]: BookingsStatus.ERROR,
+				},
 			})
-			expect(selectBookingsByDay(store.getState(), otherDate)).toBeNull()
+			expect(selectBookingsByDay(store.getState(), otherDate)).toBe(
+				BookingsStatus.ERROR
+			)
+		})
+
+		it("clears error statuses when activating another day", async () => {
+			await expect(
+				load({ error: new Error("offline"), setDay: true }).unwrap()
+			).rejects.toBe("Failed to load bookings")
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBe(
+				BookingsStatus.ERROR
+			)
+
+			store.dispatch(activateDate(otherDate))
+
+			expectActiveDate(otherDate)
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBeNull()
 		})
 	})
 
@@ -413,6 +469,47 @@ describe("bookingsSlice", () => {
 				store.dispatch(addBooking(bookingOnMorning)).unwrap()
 			).rejects.toBe("Bookings not found")
 			expect(tryAddBooking).not.toHaveBeenCalled()
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBe(
+				BookingsStatus.ERROR
+			)
+		})
+
+		it("waits for an in-flight load before validating", async () => {
+			const { promise, resolve } = createDeferred<Array<BookingInfo>>()
+			vi.mocked(tryAddBooking).mockResolvedValue({ valid: true })
+
+			const pendingLoad = load({ promise })
+			const addPromise = store.dispatch(addBooking(bookingOnLunch)).unwrap()
+
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBe(
+				BookingsStatus.LOADING
+			)
+
+			resolve([bookingOnMorning])
+			await pendingLoad.unwrap()
+			await addPromise
+
+			expect(getBookings).toHaveBeenCalledExactlyOnceWith(defaultDate)
+			expect(tryAddBooking).toHaveBeenCalledExactlyOnceWith({
+				booking: bookingOnLunch,
+				otherBookings: [bookingOnMorning],
+				today,
+				currentTime,
+			})
+			expectBookingsOf(defaultDate, [bookingOnMorning, bookingOnLunch])
+		})
+
+		it("retries a failed day before validating", async () => {
+			vi.mocked(tryAddBooking).mockResolvedValue({ valid: true })
+			await expect(load({ error: new Error("offline") }).unwrap()).rejects.toBe(
+				"Failed to load bookings"
+			)
+			vi.mocked(getBookings).mockResolvedValueOnce([bookingOnMorning])
+
+			await store.dispatch(addBooking(bookingOnLunch)).unwrap()
+
+			expect(getBookings).toHaveBeenCalledTimes(2)
+			expectBookingsOf(defaultDate, [bookingOnMorning, bookingOnLunch])
 		})
 
 		it("rejects validation errors and keeps the loaded bookings", async () => {
@@ -493,6 +590,9 @@ describe("bookingsSlice", () => {
 				store.dispatch(updateBooking(bookingOnMorning)).unwrap()
 			).rejects.toBe("Bookings not found")
 			expect(tryUpdateBooking).not.toHaveBeenCalled()
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBe(
+				BookingsStatus.ERROR
+			)
 		})
 
 		it("rejects validation errors and keeps the loaded bookings", async () => {
@@ -611,6 +711,30 @@ describe("bookingsSlice", () => {
 			).toEqual(bookingOnOtherDay)
 			expect(
 				selectBookingById(store.getState(), otherDate, "missing")
+			).toBeNull()
+		})
+
+		it("does not read bookings while a day is loading or in error", async () => {
+			const { promise, resolve } = createDeferred<Array<BookingInfo>>()
+			const request = load({ promise, setDay: true })
+
+			expect(
+				selectBookingById(store.getState(), defaultDate, bookingOnMorning.id)
+			).toBeNull()
+
+			resolve(bookingsOnDefaultDay)
+			await request.unwrap()
+
+			await expect(
+				load({
+					error: new Error("offline"),
+					date: otherDate,
+					setDay: true,
+				}).unwrap()
+			).rejects.toBe("Failed to load bookings")
+
+			expect(
+				selectBookingById(store.getState(), otherDate, bookingOnMorning.id)
 			).toBeNull()
 		})
 	})
