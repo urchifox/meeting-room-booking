@@ -14,7 +14,7 @@ import {
 	selectBookingsByDay,
 	selectIsMutationPending,
 	updateBooking,
-} from "../../store/bookingsSlice"
+} from "../../store/bookings"
 import type { BookingInfo, YearMonthDay } from "../../types/types"
 import { BookingForm } from "../BookingForm/BookingForm"
 import { BookingsList } from "../BookingsList/BookingsList"

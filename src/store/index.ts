@@ -1,6 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit"
 
-import { bookingsReducer, reset } from "./bookingsSlice"
+import { bookingsReducer, clearPendingLoads, reset } from "./bookings"
 
 export const store = configureStore({
 	reducer: {
@@ -16,5 +16,6 @@ export type AppThunk<ReturnType = void> = (
 ) => ReturnType
 
 export function resetStore() {
+	clearPendingLoads()
 	store.dispatch(reset())
 }

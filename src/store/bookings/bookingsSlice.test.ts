@@ -1,13 +1,4 @@
 import {
-	getBookings,
-	sortBookings,
-	tryAddBooking,
-	tryDeleteBooking,
-	tryUpdateBooking,
-} from "../domain/bookings"
-import type { BookingInfo, YearMonthDay } from "../types/types"
-import {
-	type BookingsState,
 	BookingsStatus,
 	activateDate,
 	addBooking,
@@ -15,11 +6,20 @@ import {
 	loadBookingsForDay,
 	retryLoadBookingsForDay,
 	selectActiveDate,
-	selectBookingById,
 	selectBookingsByDay,
 	updateBooking,
-} from "./bookingsSlice"
-import { resetStore, store } from "./index"
+} from "."
+import { resetStore, store } from ".."
+import {
+	getBookings,
+	sortBookings,
+	tryAddBooking,
+	tryDeleteBooking,
+	tryUpdateBooking,
+} from "../../domain/bookings"
+import type { BookingInfo, YearMonthDay } from "../../types/types"
+import { selectBookingById } from "./bookingsSlice"
+import type { BookingsState } from "./types"
 
 const { today, currentTime } = vi.hoisted(() => {
 	return {
@@ -28,11 +28,10 @@ const { today, currentTime } = vi.hoisted(() => {
 	}
 })
 
-vi.mock("../domain/bookings", async () => {
-	const actual =
-		await vi.importActual<typeof import("../domain/bookings")>(
-			"../domain/bookings"
-		)
+vi.mock("../../domain/bookings", async () => {
+	const actual = await vi.importActual<typeof import("../../domain/bookings")>(
+		"../../domain/bookings"
+	)
 	return {
 		...actual,
 		getBookings: vi.fn(),
@@ -43,9 +42,11 @@ vi.mock("../domain/bookings", async () => {
 	}
 })
 
-vi.mock("../domain/date", async () => {
+vi.mock("../../domain/date", async () => {
 	const actual =
-		await vi.importActual<typeof import("../domain/date")>("../domain/date")
+		await vi.importActual<typeof import("../../domain/date")>(
+			"../../domain/date"
+		)
 	return {
 		...actual,
 		getToday: vi.fn(() => today),

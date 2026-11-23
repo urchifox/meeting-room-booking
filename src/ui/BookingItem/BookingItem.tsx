@@ -1,6 +1,6 @@
 import styles from "./BookingItem.module.css"
 
-import { selectIsMutationPending } from "../../store/bookingsSlice"
+import { selectIsMutationPending } from "../../store/bookings"
 import type { BookingInfo } from "../../types/types"
 import { Button } from "../Button/Button"
 import { useAppSelector } from "../hooks/store"
