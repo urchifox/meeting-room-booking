@@ -13,6 +13,7 @@ import {
 	addBooking,
 	deleteBooking,
 	loadBookingsForDay,
+	retryLoadBookingsForDay,
 	selectActiveDate,
 	selectBookingById,
 	selectBookingsByDay,
@@ -128,12 +129,23 @@ function load({
 	return dispatchLoadBookings(date)
 }
 
+async function loadWithError({
+	date = defaultDate,
+	setDay = false,
+}: LoadOptions = {}) {
+	await load({ error: new Error("offline"), date, setDay }).unwrap().catch(
+		() => undefined
+	)
+}
+
 function createDeferred<T>() {
 	let resolve: (value: T) => void = () => {}
-	const promise = new Promise<T>((res) => {
+	let reject: (reason?: unknown) => void = () => {}
+	const promise = new Promise<T>((res, rej) => {
 		resolve = res
+		reject = rej
 	})
-	return { promise, resolve }
+	return { promise, resolve, reject }
 }
 
 function expectState(expectedState: BookingsState) {
@@ -208,6 +220,23 @@ describe("bookingsSlice", () => {
 				error: { name: "AbortError" },
 			})
 			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
+		})
+
+		it("clears loading when an aborted request fails", async () => {
+			const { promise, reject } = createDeferred<Array<BookingInfo>>()
+			const request = load({ promise, setDay: true })
+
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBe(
+				BookingsStatus.LOADING
+			)
+
+			request.abort()
+			reject(new Error("offline"))
+
+			await expect(request.unwrap()).rejects.toMatchObject({
+				name: "AbortError",
+			})
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBeNull()
 		})
 
 		it("does not clear a successful load when an aborted twin finishes later", async () => {
@@ -392,6 +421,30 @@ describe("bookingsSlice", () => {
 
 			expectActiveDate(otherDate)
 			expect(selectBookingsByDay(store.getState(), defaultDate)).toBeNull()
+		})
+	})
+
+	describe("retryLoadBookingsForDay", () => {
+		it("clears an error and reloads the day", async () => {
+			await loadWithError({ setDay: true })
+			vi.mocked(getBookings).mockResolvedValueOnce(bookingsOnDefaultDay)
+
+			await store.dispatch(retryLoadBookingsForDay(defaultDate)).unwrap()
+
+			expect(getBookings).toHaveBeenCalledTimes(2)
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
+		})
+
+		it("rejects when the retried load fails again", async () => {
+			await loadWithError({ setDay: true })
+			vi.mocked(getBookings).mockRejectedValueOnce(new Error("still offline"))
+
+			await expect(
+				store.dispatch(retryLoadBookingsForDay(defaultDate)).unwrap()
+			).rejects.toMatchObject({ message: "Failed to load bookings" })
+			expect(selectBookingsByDay(store.getState(), defaultDate)).toBe(
+				BookingsStatus.ERROR
+			)
 		})
 	})
 
@@ -722,6 +775,61 @@ describe("bookingsSlice", () => {
 		})
 	})
 
+	describe("mutation pending", () => {
+		it("blocks concurrent mutations while one is in flight", async () => {
+			const { promise, resolve } = createDeferred<{ valid: true }>()
+			vi.mocked(tryAddBooking).mockReturnValueOnce(promise)
+			await load({ bookings: bookingsOnDefaultDay }).unwrap()
+
+			const pendingAdd = store.dispatch(addBooking(bookingOnLunch))
+
+			expect(store.getState().bookings.isMutationPending).toBe(true)
+
+			const blockedUpdate = store.dispatch(updateBooking(bookingOnMorning))
+			const blockedDelete = store.dispatch(
+				deleteBooking(bookingOnMorning.id)
+			)
+			const blockedAdd = store.dispatch(addBooking(bookingOnEvening))
+
+			await expect(blockedUpdate.unwrap()).rejects.toMatchObject({
+				name: "ConditionError",
+			})
+			await expect(blockedDelete.unwrap()).rejects.toMatchObject({
+				name: "ConditionError",
+			})
+			await expect(blockedAdd.unwrap()).rejects.toMatchObject({
+				name: "ConditionError",
+			})
+			expect(tryUpdateBooking).not.toHaveBeenCalled()
+			expect(tryDeleteBooking).not.toHaveBeenCalled()
+			expect(tryAddBooking).toHaveBeenCalledTimes(1)
+
+			resolve({ valid: true })
+			await pendingAdd.unwrap()
+
+			expect(store.getState().bookings.isMutationPending).toBe(false)
+			expectBookingsOf(defaultDate, [bookingOnMorning, bookingOnLunch])
+		})
+
+		it("clears the pending flag when a mutation is rejected", async () => {
+			const { promise, resolve } = createDeferred<{
+				valid: false
+				errors: Array<string>
+			}>()
+			vi.mocked(tryAddBooking).mockReturnValueOnce(promise)
+			await load({ bookings: bookingsOnDefaultDay }).unwrap()
+
+			const pendingAdd = store.dispatch(addBooking(bookingOnLunch))
+
+			expect(store.getState().bookings.isMutationPending).toBe(true)
+
+			resolve({ valid: false, errors: validationErrors })
+			await expect(pendingAdd.unwrap()).rejects.toEqual(validationErrors)
+
+			expect(store.getState().bookings.isMutationPending).toBe(false)
+		})
+	})
+
 	describe("selectors", () => {
 		it("falls back before data is loaded and reads by day after", async () => {
 			expectActiveDate(today)
@@ -748,12 +856,32 @@ describe("bookingsSlice", () => {
 			).toBeNull()
 		})
 
+		it("finds a booking across days when no date is given", async () => {
+			const bookingOnOtherDay = makeBookingOnDate(bookingOnLunch, otherDate)
+			await load({ bookings: bookingsOnDefaultDay, setDay: true }).unwrap()
+			await load({
+				bookings: [bookingOnOtherDay],
+				date: otherDate,
+			}).unwrap()
+
+			expect(
+				selectBookingById(store.getState(), bookingOnMorning.id)
+			).toEqual(bookingOnMorning)
+			expect(
+				selectBookingById(store.getState(), bookingOnOtherDay.id)
+			).toEqual(bookingOnOtherDay)
+			expect(selectBookingById(store.getState(), "missing")).toBeNull()
+		})
+
 		it("does not read bookings while a day is loading or in error", async () => {
 			const { promise, resolve } = createDeferred<Array<BookingInfo>>()
 			const request = load({ promise, setDay: true })
 
 			expect(
 				selectBookingById(store.getState(), bookingOnMorning.id, defaultDate)
+			).toBeNull()
+			expect(
+				selectBookingById(store.getState(), bookingOnMorning.id)
 			).toBeNull()
 
 			resolve(bookingsOnDefaultDay)
@@ -770,6 +898,9 @@ describe("bookingsSlice", () => {
 			expect(
 				selectBookingById(store.getState(), bookingOnMorning.id, otherDate)
 			).toBeNull()
+			expect(
+				selectBookingById(store.getState(), bookingOnMorning.id)
+			).toEqual(bookingOnMorning)
 		})
 	})
 })
