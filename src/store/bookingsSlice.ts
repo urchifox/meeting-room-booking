@@ -242,7 +242,7 @@ const bookingsSlice = createSlice({
 			}
 			;(Object.keys(state.bookingsByDate) as Array<YearMonthDay>).forEach(
 				(date) => {
-					const bookings = state.bookingsByDate[date]
+					const bookings = getBookingsByDay(state, date)
 					if (bookings === BookingsStatus.ERROR) {
 						delete state.bookingsByDate[date]
 					}
@@ -266,7 +266,7 @@ const bookingsSlice = createSlice({
 				const bookingsByDate: BookingsByDate = {}
 				bookingsByDate[date] = valueToSet
 				return {
-					activeDate: getToday(),
+					activeDate: getActiveDate(state),
 					bookingsByDate,
 				}
 			}
@@ -289,7 +289,7 @@ const bookingsSlice = createSlice({
 				return
 			}
 			const bookingDate = action.payload.date
-			const bookingsOfDate = state.bookingsByDate[bookingDate]
+			const bookingsOfDate = getBookingsByDay(state, bookingDate)
 			if (!Array.isArray(bookingsOfDate)) {
 				return
 			}
@@ -306,13 +306,13 @@ const bookingsSlice = createSlice({
 			}
 			const updatedBooking = action.payload
 
-			const requestedBooking = findBookingById(state, updatedBooking.id)
+			const requestedBooking = getBookingById(state, updatedBooking.id)
 			if (requestedBooking === null) {
 				return
 			}
 
 			const initialDate = requestedBooking.date
-			const bookingsOfInitialDay = state.bookingsByDate[initialDate]
+			const bookingsOfInitialDay = getBookingsByDay(state, initialDate)
 			if (!Array.isArray(bookingsOfInitialDay)) {
 				return
 			}
@@ -322,7 +322,7 @@ const bookingsSlice = createSlice({
 			)
 
 			const updatedDate = updatedBooking.date
-			const bookingsOfUpdatedDay = state.bookingsByDate[updatedDate]
+			const bookingsOfUpdatedDay = getBookingsByDay(state, updatedDate)
 			if (!Array.isArray(bookingsOfUpdatedDay)) {
 				return
 			}
@@ -338,12 +338,12 @@ const bookingsSlice = createSlice({
 			}
 
 			const id = action.payload
-			const requestedBooking = findBookingById(state, id)
+			const requestedBooking = getBookingById(state, id)
 			if (requestedBooking === null) {
 				return
 			}
 
-			const bookingsOfDate = state.bookingsByDate[requestedBooking.date]
+			const bookingsOfDate = getBookingsByDay(state, requestedBooking.date)
 			if (!Array.isArray(bookingsOfDate)) {
 				return
 			}
@@ -360,23 +360,35 @@ const bookingsSlice = createSlice({
 	},
 
 	selectors: {
-		selectActiveDate: (state) => state?.activeDate ?? getToday(),
-		selectBookingsByDay: (state, date: YearMonthDay) =>
-			state?.bookingsByDate[date] ?? null,
-		selectBookingById: findBookingById,
+		selectActiveDate: getActiveDate,
+		selectBookingsByDay: getBookingsByDay,
+		selectBookingById: getBookingById,
 	},
 })
 
-function findBookingById(state: BookingsState, id: BookingInfo["id"], date?: YearMonthDay) {
+function getActiveDate(state: BookingsState) {
+	return state?.activeDate ?? getToday()
+}
+
+function getBookingsByDay(state: BookingsState, date: YearMonthDay) {
+	return state?.bookingsByDate[date] ?? null
+}
+
+function getBookingById(
+	state: BookingsState,
+	id: BookingInfo["id"],
+	date?: YearMonthDay
+) {
 	if (state === null) {
 		return null
 	}
 
-	const allBookings = state.bookingsByDate
 	const bookingsToSearch =
 		date === undefined
-			? Object.values(allBookings).flat().filter((item) => typeof item !== "string" && item !== undefined)
-			: allBookings[date]
+			? Object.values(state.bookingsByDate)
+					.flat()
+					.filter((item) => typeof item !== "string" && item !== undefined)
+			: getBookingsByDay(state, date)
 	if (!Array.isArray(bookingsToSearch)) {
 		return null
 	}
