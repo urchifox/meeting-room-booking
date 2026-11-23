@@ -202,6 +202,8 @@ export const updateBooking = createAsyncThunk<
 			const result = await tryUpdateBooking({
 				booking,
 				otherBookings,
+				today: getToday(),
+				currentTime: getCurrentTime(),
 			})
 			if (!result.valid) {
 				return rejectWithValue(result.errors)

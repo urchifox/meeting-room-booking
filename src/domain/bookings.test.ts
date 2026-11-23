@@ -192,6 +192,8 @@ describe("bookings server errors", () => {
 		const result = await tryUpdateBooking({
 			booking: { ...booking, id: "missing-booking" },
 			otherBookings: [],
+			today,
+			currentTime,
 		})
 
 		expect(result).toEqual({

@@ -546,6 +546,8 @@ describe("bookingsSlice", () => {
 			expect(tryUpdateBooking).toHaveBeenCalledExactlyOnceWith({
 				booking: updatedLunch,
 				otherBookings: [bookingOnMorning],
+				today,
+				currentTime,
 			})
 			expectBookingsOf(defaultDate, [bookingOnMorning, updatedLunch])
 		})
@@ -569,6 +571,8 @@ describe("bookingsSlice", () => {
 			expect(tryUpdateBooking).toHaveBeenCalledExactlyOnceWith({
 				booking: bookingOnMorningMoved,
 				otherBookings: [bookingOnLunchMoved],
+				today,
+				currentTime,
 			})
 			expectActiveDate(defaultDate)
 			expectBookingsOf(defaultDate, [bookingOnLunch])
@@ -597,6 +601,8 @@ describe("bookingsSlice", () => {
 			expect(tryUpdateBooking).toHaveBeenCalledExactlyOnceWith({
 				booking: updatedBookingOnOtherDay,
 				otherBookings: [],
+				today,
+				currentTime,
 			})
 			expectActiveDate(defaultDate)
 			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
