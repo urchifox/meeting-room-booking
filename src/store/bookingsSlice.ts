@@ -304,26 +304,38 @@ const bookingsSlice = createSlice({
 			if (state === null) {
 				return
 			}
-			const booking = action.payload
-			const activeDate = state.activeDate
-			const updatedDate = booking.date
+			const updatedBooking = action.payload
 
-			const bookingsOfActiveDay = state.bookingsByDate[activeDate]
-			if (!Array.isArray(bookingsOfActiveDay)) {
+			const id = updatedBooking.id
+			const allBookings = Object.values(state.bookingsByDate).flat()
+			const requestedBooking = allBookings.find(
+				(item) => typeof item !== "string" && item?.id === id
+			)
+			if (
+				requestedBooking === undefined ||
+				typeof requestedBooking === "string"
+			) {
 				return
 			}
-			state.bookingsByDate[activeDate] = excludeBooking(
-				bookingsOfActiveDay,
-				booking.id
+
+			const initialDate = requestedBooking.date
+			const bookingsOfInitialDay = state.bookingsByDate[initialDate]
+			if (!Array.isArray(bookingsOfInitialDay)) {
+				return
+			}
+			state.bookingsByDate[initialDate] = excludeBooking(
+				bookingsOfInitialDay,
+				updatedBooking.id
 			)
 
+			const updatedDate = updatedBooking.date
 			const bookingsOfUpdatedDay = state.bookingsByDate[updatedDate]
 			if (!Array.isArray(bookingsOfUpdatedDay)) {
 				return
 			}
 			state.bookingsByDate[updatedDate] = sortBookings([
 				...bookingsOfUpdatedDay,
-				booking,
+				updatedBooking,
 			])
 		},
 

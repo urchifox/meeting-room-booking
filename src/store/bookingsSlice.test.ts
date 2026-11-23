@@ -583,6 +583,34 @@ describe("bookingsSlice", () => {
 			expectBookingsOf(otherDate, [bookingOnMorningMoved, bookingOnLunchMoved])
 		})
 
+		it("updates a booking on another day", async () => {
+			vi.mocked(tryUpdateBooking).mockResolvedValue({ valid: true })
+			await load({
+				bookings: bookingsOnDefaultDay,
+				setDay: true,
+			}).unwrap()
+			const bookingOnOtherDay = makeBookingOnDate(bookingOnEvening, otherDate)
+			await load({
+				bookings: [bookingOnOtherDay],
+				date: otherDate,
+			}).unwrap()
+			
+			const updatedBookingOnOtherDay = {
+				...bookingOnOtherDay,
+				title: "Updated evening",
+				timeRange: { start: "18:00", end: "19:00" },
+			} satisfies BookingInfo
+			await store.dispatch(updateBooking(updatedBookingOnOtherDay)).unwrap()
+
+			expect(tryUpdateBooking).toHaveBeenCalledExactlyOnceWith({
+				booking: updatedBookingOnOtherDay,
+				otherBookings: [],
+			})
+			expectActiveDate(defaultDate)
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
+			expectBookingsOf(otherDate, [updatedBookingOnOtherDay])
+		})
+
 		it("rejects without validating when the day cannot be loaded", async () => {
 			vi.mocked(getBookings).mockRejectedValueOnce(new Error("offline"))
 
