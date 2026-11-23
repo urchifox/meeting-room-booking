@@ -6,6 +6,8 @@ import { getToday, isHourMinute, isYearMonthDay } from "../../domain/date"
 import { END_TIME, START_TIME } from "../../domain/rules"
 import type { BookingInfo, HourMinute, YearMonthDay } from "../../types/types"
 import { Button } from "../Button/Button"
+import { useAppSelector } from "../hooks/store"
+import { selectIsMutationPending } from "../../store/bookingsSlice"
 
 type BookingFormValues = {
 	title: string
@@ -41,6 +43,7 @@ export function BookingForm({
 	bookingInfo?: BookingInfo
 	onSubmit: (booking: BookingInfo) => void
 }) {
+	const isMutationPending = useAppSelector(selectIsMutationPending)
 	const [values, setValues] = useState(() => toFormValues(bookingInfo))
 	const [sourceBooking, setSourceBooking] = useState(bookingInfo)
 
@@ -140,7 +143,7 @@ export function BookingForm({
 				/>
 			</div>
 
-			<Button onClick={submitBooking}>
+			<Button onClick={submitBooking} disabled={isMutationPending}>
 				{bookingInfo ? "Update Booking" : "Add Booking"}
 			</Button>
 		</form>

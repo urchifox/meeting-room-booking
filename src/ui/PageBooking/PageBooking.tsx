@@ -12,6 +12,7 @@ import {
 	retryLoadBookingsForDay,
 	selectActiveDate,
 	selectBookingsByDay,
+	selectIsMutationPending,
 	updateBooking,
 } from "../../store/bookingsSlice"
 import type { BookingInfo, YearMonthDay } from "../../types/types"
@@ -25,6 +26,7 @@ export function PageBooking() {
 	const today = getToday()
 	const dispatch = useAppDispatch()
 	const date = useAppSelector(selectActiveDate)
+	const isMutationPending = useAppSelector(selectIsMutationPending)
 	const bookings = useAppSelector((state) => selectBookingsByDay(state, date))
 	const [isModalFormOpen, setIsModalFormOpen] = useState(false)
 	const [bookingInfo, setBookingInfo] = useState<BookingInfo | undefined>(
@@ -34,11 +36,17 @@ export function PageBooking() {
 	const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
 
 	const onAddClick = () => {
+		if (isMutationPending) {
+			return
+		}
 		setBookingInfo(undefined)
 		setIsModalFormOpen(true)
 	}
 
 	const onEditClick = (booking: BookingInfo) => {
+		if (isMutationPending) {
+			return
+		}
 		setBookingInfo(booking)
 		setIsModalFormOpen(true)
 	}
@@ -62,6 +70,9 @@ export function PageBooking() {
 	}
 
 	const onSubmit = (booking: BookingInfo) => {
+		if (isMutationPending) {
+			return
+		}
 		const isNewBooking = bookingInfo === undefined
 		const action = isNewBooking ? addBooking : updateBooking
 
@@ -72,6 +83,9 @@ export function PageBooking() {
 	}
 
 	const onDeleteClick = (id: string) => {
+		if (isMutationPending) {
+			return
+		}
 		dispatch(deleteBooking(id)).unwrap().catch(showErrorMessage)
 	}
 
@@ -100,7 +114,7 @@ export function PageBooking() {
 	return (
 		<section className={styles.pageBooking}>
 			<h1>Book a meeting room</h1>
-			<Button onClick={onAddClick}>Add Booking</Button>
+			<Button onClick={onAddClick} disabled={isMutationPending}>Add Booking</Button>
 			<input
 				type="date"
 				id="bookings-list-date"
@@ -115,7 +129,7 @@ export function PageBooking() {
 			{bookings === BookingsStatus.ERROR && (
 				<>
 					<p>Error loading bookings</p>
-					<Button onClick={onRetryClick}>Retry</Button>
+					<Button onClick={onRetryClick} disabled={isMutationPending}>Retry</Button>
 				</>
 			)}
 			{Array.isArray(bookings) && (

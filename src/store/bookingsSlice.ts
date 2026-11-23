@@ -395,11 +395,16 @@ const bookingsSlice = createSlice({
 	},
 
 	selectors: {
+		selectIsMutationPending: isMutationPending,
 		selectActiveDate: getActiveDate,
 		selectBookingsByDay: getBookingsByDay,
 		selectBookingById: getBookingById,
 	},
 })
+
+function isMutationPending(state: BookingsState) {
+	return state.isMutationPending
+}
 
 function getActiveDate(state: BookingsState) {
 	return state.activeDate ?? getToday()
@@ -432,5 +437,5 @@ function getBookingById(
 
 export const bookingsReducer = bookingsSlice.reducer
 export const { activateDate, reset } = bookingsSlice.actions
-export const { selectActiveDate, selectBookingsByDay, selectBookingById } =
+export const { selectIsMutationPending, selectActiveDate, selectBookingsByDay, selectBookingById } =
 	bookingsSlice.selectors
