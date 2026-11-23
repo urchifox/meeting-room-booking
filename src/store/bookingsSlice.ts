@@ -113,7 +113,17 @@ function onLoadFulfilled({
 	aborted: boolean
 }) {
 	if (aborted) {
-		if (selectBookingsByDay(getState(), date) === BookingsStatus.LOADING) {
+		if (selectBookingsByDay(getState(), date) !== BookingsStatus.LOADING) {
+			return
+		}
+		if (Array.isArray(result)) {
+			dispatch(
+				bookingsSlice.actions.setBookingsForDate({
+					date,
+					bookings: result,
+				})
+			)
+		} else {
 			dispatch(bookingsSlice.actions.removeBookingsForDate(date))
 		}
 	} else {

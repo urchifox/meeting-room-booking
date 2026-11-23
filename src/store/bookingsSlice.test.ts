@@ -187,7 +187,7 @@ describe("bookingsSlice", () => {
 			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
 		})
 
-		it("clears loading and does not store bookings when the request is aborted", async () => {
+		it("caches bookings when an aborted request still finishes successfully", async () => {
 			const { promise, resolve } = createDeferred<Array<BookingInfo>>()
 			const request = load({ promise, setDay: true })
 			const settled = request.unwrap().then(
@@ -206,11 +206,7 @@ describe("bookingsSlice", () => {
 				aborted: true,
 				error: { name: "AbortError" },
 			})
-			expectState({
-				activeDate: defaultDate,
-				bookingsByDate: {},
-			})
-			expect(selectBookingsByDay(store.getState(), defaultDate)).toBeNull()
+			expectBookingsOf(defaultDate, bookingsOnDefaultDay)
 		})
 
 		it("does not clear a successful load when an aborted twin finishes later", async () => {
