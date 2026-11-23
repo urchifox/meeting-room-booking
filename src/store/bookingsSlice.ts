@@ -28,7 +28,7 @@ import type {
 export type BookingsState = {
 	activeDate: YearMonthDay
 	bookingsByDate: BookingsByDate
-} | null
+}
 
 type BookingsByDate = Partial<
 	Record<YearMonthDay, Array<BookingInfo> | BookingsStatus>
@@ -39,7 +39,10 @@ export enum BookingsStatus {
 	ERROR = "ERROR",
 }
 
-const initialState = null as BookingsState
+const initialState = {
+	activeDate: getToday(),
+	bookingsByDate: {},
+} as BookingsState
 
 const mapOfLoads = new Map<YearMonthDay, Promise<Array<BookingInfo>>>()
 
@@ -245,12 +248,6 @@ const bookingsSlice = createSlice({
 			state: BookingsState,
 			action: PayloadAction<YearMonthDay>
 		) => {
-			if (state === null) {
-				return {
-					activeDate: action.payload,
-					bookingsByDate: {},
-				}
-			}
 			;(Object.keys(state.bookingsByDate) as Array<YearMonthDay>).forEach(
 				(date) => {
 					const bookings = getBookingsByDay(state, date)
@@ -273,15 +270,6 @@ const bookingsSlice = createSlice({
 			const valueToSet = Array.isArray(bookings)
 				? sortBookings(bookings)
 				: bookings
-			if (state === null) {
-				const bookingsByDate: BookingsByDate = {}
-				bookingsByDate[date] = valueToSet
-				return {
-					activeDate: getActiveDate(state),
-					bookingsByDate,
-				}
-			}
-
 			state.bookingsByDate[date] = valueToSet
 		},
 
@@ -289,16 +277,10 @@ const bookingsSlice = createSlice({
 			state: BookingsState,
 			action: PayloadAction<YearMonthDay>
 		) => {
-			if (state === null) {
-				return
-			}
 			delete state.bookingsByDate[action.payload]
 		},
 
 		addBooking: (state: BookingsState, action: PayloadAction<BookingInfo>) => {
-			if (state === null) {
-				return
-			}
 			const bookingDate = action.payload.date
 			const bookingsOfDate = getBookingsByDay(state, bookingDate)
 			if (!Array.isArray(bookingsOfDate)) {
@@ -312,9 +294,6 @@ const bookingsSlice = createSlice({
 			state: BookingsState,
 			action: PayloadAction<BookingInfo>
 		) => {
-			if (state === null) {
-				return
-			}
 			const updatedBooking = action.payload
 
 			const requestedBooking = getBookingById(state, updatedBooking.id)
@@ -344,10 +323,6 @@ const bookingsSlice = createSlice({
 		},
 
 		deleteBooking: (state: BookingsState, action: PayloadAction<string>) => {
-			if (state === null) {
-				return
-			}
-
 			const id = action.payload
 			const requestedBooking = getBookingById(state, id)
 			if (requestedBooking === null) {
@@ -379,18 +354,12 @@ const bookingsSlice = createSlice({
 					isPending = true
 				}
 			)
-			.addMatcher(
-				isFulfilled(addBooking, updateBooking, deleteBooking),
-				() => {
-					isPending = false
-				}
-			)
-			.addMatcher(
-				isRejected(addBooking, updateBooking, deleteBooking),
-				() => {
-					isPending = false
-				}
-			)
+			.addMatcher(isFulfilled(addBooking, updateBooking, deleteBooking), () => {
+				isPending = false
+			})
+			.addMatcher(isRejected(addBooking, updateBooking, deleteBooking), () => {
+				isPending = false
+			})
 	},
 
 	selectors: {
@@ -401,11 +370,11 @@ const bookingsSlice = createSlice({
 })
 
 function getActiveDate(state: BookingsState) {
-	return state?.activeDate ?? getToday()
+	return state.activeDate ?? getToday()
 }
 
 function getBookingsByDay(state: BookingsState, date: YearMonthDay) {
-	return state?.bookingsByDate[date] ?? null
+	return state.bookingsByDate[date] ?? null
 }
 
 function getBookingById(
@@ -413,10 +382,6 @@ function getBookingById(
 	id: BookingInfo["id"],
 	date?: YearMonthDay
 ) {
-	if (state === null) {
-		return null
-	}
-
 	const bookingsToSearch =
 		date === undefined
 			? Object.values(state.bookingsByDate)

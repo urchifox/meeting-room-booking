@@ -138,11 +138,7 @@ function createDeferred<T>() {
 
 function expectState(expectedState: BookingsState) {
 	const state = store.getState().bookings
-	if (expectedState === null) {
-		expect(state).toBeNull()
-	} else {
-		expect(state).toEqual(expectedState)
-	}
+	expect(state).toEqual(expectedState)
 }
 
 function expectActiveDate(expectedDate: YearMonthDay) {
@@ -594,7 +590,7 @@ describe("bookingsSlice", () => {
 				bookings: [bookingOnOtherDay],
 				date: otherDate,
 			}).unwrap()
-			
+
 			const updatedBookingOnOtherDay = {
 				...bookingOnOtherDay,
 				title: "Updated evening",
@@ -689,7 +685,10 @@ describe("bookingsSlice", () => {
 
 			await store.dispatch(deleteBooking(bookingOnMorning.id)).unwrap()
 
-			expectState(null)
+			expectState({
+				activeDate: defaultDate,
+				bookingsByDate: {},
+			})
 		})
 
 		it("rejects validation errors and keeps the loaded bookings", async () => {
