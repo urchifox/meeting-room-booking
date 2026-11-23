@@ -4,6 +4,9 @@ import {
 	type UnknownAction,
 	createAsyncThunk,
 	createSlice,
+	isFulfilled,
+	isPending as isPendingAction,
+	isRejected,
 } from "@reduxjs/toolkit"
 
 import type { RootState } from "."
@@ -120,6 +123,8 @@ function onLoadFulfilled({
 	}
 }
 
+let isPending: boolean = false
+
 export const addBooking = createAsyncThunk<
 	ValidationResult,
 	BookingInfo,
@@ -151,7 +156,8 @@ export const addBooking = createAsyncThunk<
 		} catch (_) {
 			return rejectWithValue("Failed to add booking")
 		}
-	}
+	},
+	{ condition: () => !isPending }
 )
 
 export const updateBooking = createAsyncThunk<
@@ -183,7 +189,8 @@ export const updateBooking = createAsyncThunk<
 		} catch (_) {
 			return rejectWithValue("Failed to update booking")
 		}
-	}
+	},
+	{ condition: () => !isPending }
 )
 
 async function getOtherBookings({
@@ -213,18 +220,22 @@ export const deleteBooking = createAsyncThunk<
 	ValidationResult,
 	BookingInfo["id"],
 	{ rejectValue: Array<string> | string }
->("bookings/deleteBooking", async (id, { dispatch, rejectWithValue }) => {
-	try {
-		const result = await tryDeleteBooking(id)
-		if (!result.valid) {
-			return rejectWithValue(result.errors)
+>(
+	"bookings/deleteBooking",
+	async (id, { dispatch, rejectWithValue }) => {
+		try {
+			const result = await tryDeleteBooking(id)
+			if (!result.valid) {
+				return rejectWithValue(result.errors)
+			}
+			dispatch(bookingsSlice.actions.deleteBooking(id))
+			return result
+		} catch (_) {
+			return rejectWithValue("Failed to delete booking")
 		}
-		dispatch(bookingsSlice.actions.deleteBooking(id))
-		return result
-	} catch (_) {
-		return rejectWithValue("Failed to delete booking")
-	}
-})
+	},
+	{ condition: () => !isPending }
+)
 
 const bookingsSlice = createSlice({
 	name: "bookings",
@@ -355,8 +366,31 @@ const bookingsSlice = createSlice({
 
 		reset: () => {
 			mapOfLoads.clear()
+			isPending = false
 			return initialState
 		},
+	},
+
+	extraReducers: (builder) => {
+		builder
+			.addMatcher(
+				isPendingAction(addBooking, updateBooking, deleteBooking),
+				() => {
+					isPending = true
+				}
+			)
+			.addMatcher(
+				isFulfilled(addBooking, updateBooking, deleteBooking),
+				() => {
+					isPending = false
+				}
+			)
+			.addMatcher(
+				isRejected(addBooking, updateBooking, deleteBooking),
+				() => {
+					isPending = false
+				}
+			)
 	},
 
 	selectors: {
