@@ -80,6 +80,10 @@ export function PageBooking() {
 		dispatch(activateDate(newDate as YearMonthDay))
 	}
 
+	const onRetryClick = () => {
+		dispatch(retryLoadBookingsForDay(date)).unwrap().catch(showErrorMessage)
+	}
+
 	useEffect(() => {
 		if (bookings !== null) {
 			return
@@ -111,9 +115,7 @@ export function PageBooking() {
 			{bookings === BookingsStatus.ERROR && (
 				<>
 					<p>Error loading bookings</p>
-					<Button onClick={() => void dispatch(retryLoadBookingsForDay(date))}>
-						Retry
-					</Button>
+					<Button onClick={onRetryClick}>Retry</Button>
 				</>
 			)}
 			{Array.isArray(bookings) && (
