@@ -133,9 +133,9 @@ async function loadWithError({
 	date = defaultDate,
 	setDay = false,
 }: LoadOptions = {}) {
-	await load({ error: new Error("offline"), date, setDay }).unwrap().catch(
-		() => undefined
-	)
+	await load({ error: new Error("offline"), date, setDay })
+		.unwrap()
+		.catch(() => undefined)
 }
 
 function createDeferred<T>() {
@@ -786,9 +786,7 @@ describe("bookingsSlice", () => {
 			expect(store.getState().bookings.isMutationPending).toBe(true)
 
 			const blockedUpdate = store.dispatch(updateBooking(bookingOnMorning))
-			const blockedDelete = store.dispatch(
-				deleteBooking(bookingOnMorning.id)
-			)
+			const blockedDelete = store.dispatch(deleteBooking(bookingOnMorning.id))
 			const blockedAdd = store.dispatch(addBooking(bookingOnEvening))
 
 			await expect(blockedUpdate.unwrap()).rejects.toMatchObject({
@@ -864,12 +862,12 @@ describe("bookingsSlice", () => {
 				date: otherDate,
 			}).unwrap()
 
-			expect(
-				selectBookingById(store.getState(), bookingOnMorning.id)
-			).toEqual(bookingOnMorning)
-			expect(
-				selectBookingById(store.getState(), bookingOnOtherDay.id)
-			).toEqual(bookingOnOtherDay)
+			expect(selectBookingById(store.getState(), bookingOnMorning.id)).toEqual(
+				bookingOnMorning
+			)
+			expect(selectBookingById(store.getState(), bookingOnOtherDay.id)).toEqual(
+				bookingOnOtherDay
+			)
 			expect(selectBookingById(store.getState(), "missing")).toBeNull()
 		})
 
@@ -898,9 +896,9 @@ describe("bookingsSlice", () => {
 			expect(
 				selectBookingById(store.getState(), bookingOnMorning.id, otherDate)
 			).toBeNull()
-			expect(
-				selectBookingById(store.getState(), bookingOnMorning.id)
-			).toEqual(bookingOnMorning)
+			expect(selectBookingById(store.getState(), bookingOnMorning.id)).toEqual(
+				bookingOnMorning
+			)
 		})
 	})
 })

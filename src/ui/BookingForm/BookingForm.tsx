@@ -4,10 +4,10 @@ import { type ChangeEvent, useState } from "react"
 
 import { getToday, isHourMinute, isYearMonthDay } from "../../domain/date"
 import { END_TIME, START_TIME } from "../../domain/rules"
+import { selectIsMutationPending } from "../../store/bookingsSlice"
 import type { BookingInfo, HourMinute, YearMonthDay } from "../../types/types"
 import { Button } from "../Button/Button"
 import { useAppSelector } from "../hooks/store"
-import { selectIsMutationPending } from "../../store/bookingsSlice"
 
 type BookingFormValues = {
 	title: string

@@ -437,5 +437,9 @@ function getBookingById(
 
 export const bookingsReducer = bookingsSlice.reducer
 export const { activateDate, reset } = bookingsSlice.actions
-export const { selectIsMutationPending, selectActiveDate, selectBookingsByDay, selectBookingById } =
-	bookingsSlice.selectors
+export const {
+	selectIsMutationPending,
+	selectActiveDate,
+	selectBookingsByDay,
+	selectBookingById,
+} = bookingsSlice.selectors

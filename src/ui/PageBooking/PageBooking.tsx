@@ -114,7 +114,9 @@ export function PageBooking() {
 	return (
 		<section className={styles.pageBooking}>
 			<h1>Book a meeting room</h1>
-			<Button onClick={onAddClick} disabled={isMutationPending}>Add Booking</Button>
+			<Button onClick={onAddClick} disabled={isMutationPending}>
+				Add Booking
+			</Button>
 			<input
 				type="date"
 				id="bookings-list-date"
@@ -129,7 +131,9 @@ export function PageBooking() {
 			{bookings === BookingsStatus.ERROR && (
 				<>
 					<p>Error loading bookings</p>
-					<Button onClick={onRetryClick} disabled={isMutationPending}>Retry</Button>
+					<Button onClick={onRetryClick} disabled={isMutationPending}>
+						Retry
+					</Button>
 				</>
 			)}
 			{Array.isArray(bookings) && (
