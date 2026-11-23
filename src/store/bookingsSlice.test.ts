@@ -721,7 +721,7 @@ describe("bookingsSlice", () => {
 			expectActiveDate(today)
 			expect(selectBookingsByDay(store.getState(), defaultDate)).toBeNull()
 			expect(
-				selectBookingById(store.getState(), defaultDate, bookingOnMorning.id)
+				selectBookingById(store.getState(), bookingOnMorning.id, defaultDate)
 			).toBeNull()
 
 			const bookingOnOtherDay = makeBookingOnDate(bookingOnLunch, otherDate)
@@ -735,10 +735,10 @@ describe("bookingsSlice", () => {
 			expectBookingsOf(otherDate, [bookingOnOtherDay])
 			expect(selectBookingsByDay(store.getState(), defaultDate)).toBeNull()
 			expect(
-				selectBookingById(store.getState(), otherDate, bookingOnOtherDay.id)
+				selectBookingById(store.getState(), bookingOnOtherDay.id, otherDate)
 			).toEqual(bookingOnOtherDay)
 			expect(
-				selectBookingById(store.getState(), otherDate, "missing")
+				selectBookingById(store.getState(), "missing", otherDate)
 			).toBeNull()
 		})
 
@@ -747,7 +747,7 @@ describe("bookingsSlice", () => {
 			const request = load({ promise, setDay: true })
 
 			expect(
-				selectBookingById(store.getState(), defaultDate, bookingOnMorning.id)
+				selectBookingById(store.getState(), bookingOnMorning.id, defaultDate)
 			).toBeNull()
 
 			resolve(bookingsOnDefaultDay)
@@ -762,7 +762,7 @@ describe("bookingsSlice", () => {
 			).rejects.toBe("Failed to load bookings")
 
 			expect(
-				selectBookingById(store.getState(), otherDate, bookingOnMorning.id)
+				selectBookingById(store.getState(), bookingOnMorning.id, otherDate)
 			).toBeNull()
 		})
 	})

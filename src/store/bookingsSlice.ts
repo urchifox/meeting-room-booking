@@ -363,28 +363,28 @@ const bookingsSlice = createSlice({
 		selectActiveDate: (state) => state?.activeDate ?? getToday(),
 		selectBookingsByDay: (state, date: YearMonthDay) =>
 			state?.bookingsByDate[date] ?? null,
-		selectBookingById: (state, date: YearMonthDay, id: BookingInfo["id"]) => {
-			const bookings = state?.bookingsByDate[date]
-			if (!Array.isArray(bookings)) {
-				return null
-			}
-			return bookings.find((booking) => booking.id === id) ?? null
-		},
+		selectBookingById: findBookingById,
 	},
 })
 
-function findBookingById(state: BookingsState, id: BookingInfo["id"]) {
+function findBookingById(state: BookingsState, id: BookingInfo["id"], date?: YearMonthDay) {
 	if (state === null) {
 		return null
 	}
-	const allBookings = Object.values(state.bookingsByDate).flat()
-	const requestedBooking = allBookings.find(
-		(item) => typeof item !== "string" && item?.id === id
-	)
-	if (requestedBooking === undefined || typeof requestedBooking === "string") {
+
+	const allBookings = state.bookingsByDate
+	const bookingsToSearch =
+		date === undefined
+			? Object.values(allBookings).flat().filter((item) => typeof item !== "string" && item !== undefined)
+			: allBookings[date]
+	if (!Array.isArray(bookingsToSearch)) {
 		return null
 	}
-	return requestedBooking
+	return (
+		bookingsToSearch.find(
+			(booking) => typeof booking !== "string" && booking?.id === id
+		) ?? null
+	)
 }
 
 export const bookingsReducer = bookingsSlice.reducer
