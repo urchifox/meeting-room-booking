@@ -109,7 +109,8 @@ export function PageBooking() {
 		return () => {
 			request.abort()
 		}
-	}, [bookings, date, dispatch])
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [date, dispatch])
 
 	return (
 		<section className={styles.pageBooking}>
