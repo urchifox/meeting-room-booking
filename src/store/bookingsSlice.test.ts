@@ -170,6 +170,7 @@ describe("bookingsSlice", () => {
 			expectState({
 				activeDate: defaultDate,
 				bookingsByDate: { [defaultDate]: expectedBookings },
+				isMutationPending: false,
 			})
 		})
 
@@ -268,6 +269,7 @@ describe("bookingsSlice", () => {
 					[defaultDate]: bookingsOnDefaultDay,
 					[otherDate]: bookingsOnOtherDay,
 				},
+				isMutationPending: false,
 			})
 		})
 
@@ -343,6 +345,7 @@ describe("bookingsSlice", () => {
 			expectState({
 				activeDate: defaultDate,
 				bookingsByDate: { [defaultDate]: BookingsStatus.ERROR },
+				isMutationPending: false,
 			})
 			expect(selectBookingsByDay(store.getState(), defaultDate)).toBe(
 				BookingsStatus.ERROR
@@ -370,6 +373,7 @@ describe("bookingsSlice", () => {
 					[defaultDate]: bookingsOnDefaultDay,
 					[otherDate]: BookingsStatus.ERROR,
 				},
+				isMutationPending: false,
 			})
 			expect(selectBookingsByDay(store.getState(), otherDate)).toBe(
 				BookingsStatus.ERROR
@@ -690,6 +694,7 @@ describe("bookingsSlice", () => {
 			expectState({
 				activeDate: defaultDate,
 				bookingsByDate: {},
+				isMutationPending: false,
 			})
 		})
 

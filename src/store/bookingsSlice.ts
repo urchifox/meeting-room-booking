@@ -28,6 +28,7 @@ import type {
 export type BookingsState = {
 	activeDate: YearMonthDay
 	bookingsByDate: BookingsByDate
+	isMutationPending: boolean
 }
 
 type BookingsByDate = Partial<
@@ -42,6 +43,7 @@ export enum BookingsStatus {
 const initialState = {
 	activeDate: getToday(),
 	bookingsByDate: {},
+	isMutationPending: false,
 } as BookingsState
 
 const mapOfLoads = new Map<YearMonthDay, Promise<Array<BookingInfo>>>()
@@ -145,8 +147,6 @@ export const retryLoadBookingsForDay = createAsyncThunk<
 	return dispatch(loadBookingsForDay(date)).unwrap()
 })
 
-let isPending: boolean = false
-
 export const addBooking = createAsyncThunk<
 	ValidationResult,
 	BookingInfo,
@@ -179,7 +179,9 @@ export const addBooking = createAsyncThunk<
 			return rejectWithValue("Failed to add booking")
 		}
 	},
-	{ condition: () => !isPending }
+	{
+		condition: (_, { getState }) => !getState().bookings.isMutationPending,
+	}
 )
 
 export const updateBooking = createAsyncThunk<
@@ -214,7 +216,9 @@ export const updateBooking = createAsyncThunk<
 			return rejectWithValue("Failed to update booking")
 		}
 	},
-	{ condition: () => !isPending }
+	{
+		condition: (_, { getState }) => !getState().bookings.isMutationPending,
+	}
 )
 
 async function getOtherBookings({
@@ -243,7 +247,7 @@ async function getOtherBookings({
 export const deleteBooking = createAsyncThunk<
 	ValidationResult,
 	BookingInfo["id"],
-	{ rejectValue: Array<string> | string }
+	{ state: RootState; rejectValue: Array<string> | string }
 >(
 	"bookings/deleteBooking",
 	async (id, { dispatch, rejectWithValue }) => {
@@ -258,7 +262,9 @@ export const deleteBooking = createAsyncThunk<
 			return rejectWithValue("Failed to delete booking")
 		}
 	},
-	{ condition: () => !isPending }
+	{
+		condition: (_, { getState }) => !getState().bookings.isMutationPending,
+	}
 )
 
 const bookingsSlice = createSlice({
@@ -362,7 +368,6 @@ const bookingsSlice = createSlice({
 
 		reset: () => {
 			mapOfLoads.clear()
-			isPending = false
 			return initialState
 		},
 	},
@@ -371,16 +376,22 @@ const bookingsSlice = createSlice({
 		builder
 			.addMatcher(
 				isPendingAction(addBooking, updateBooking, deleteBooking),
-				() => {
-					isPending = true
+				(state) => {
+					state.isMutationPending = true
 				}
 			)
-			.addMatcher(isFulfilled(addBooking, updateBooking, deleteBooking), () => {
-				isPending = false
-			})
-			.addMatcher(isRejected(addBooking, updateBooking, deleteBooking), () => {
-				isPending = false
-			})
+			.addMatcher(
+				isFulfilled(addBooking, updateBooking, deleteBooking),
+				(state) => {
+					state.isMutationPending = false
+				}
+			)
+			.addMatcher(
+				isRejected(addBooking, updateBooking, deleteBooking),
+				(state) => {
+					state.isMutationPending = false
+				}
+			)
 	},
 
 	selectors: {
