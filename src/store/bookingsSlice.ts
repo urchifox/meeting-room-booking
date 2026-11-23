@@ -306,15 +306,8 @@ const bookingsSlice = createSlice({
 			}
 			const updatedBooking = action.payload
 
-			const id = updatedBooking.id
-			const allBookings = Object.values(state.bookingsByDate).flat()
-			const requestedBooking = allBookings.find(
-				(item) => typeof item !== "string" && item?.id === id
-			)
-			if (
-				requestedBooking === undefined ||
-				typeof requestedBooking === "string"
-			) {
+			const requestedBooking = findBookingById(state, updatedBooking.id)
+			if (requestedBooking === null) {
 				return
 			}
 
@@ -345,14 +338,8 @@ const bookingsSlice = createSlice({
 			}
 
 			const id = action.payload
-			const allBookings = Object.values(state.bookingsByDate).flat()
-			const requestedBooking = allBookings.find(
-				(item) => typeof item !== "string" && item?.id === id
-			)
-			if (
-				requestedBooking === undefined ||
-				typeof requestedBooking === "string"
-			) {
+			const requestedBooking = findBookingById(state, id)
+			if (requestedBooking === null) {
 				return
 			}
 
@@ -385,6 +372,20 @@ const bookingsSlice = createSlice({
 		},
 	},
 })
+
+function findBookingById(state: BookingsState, id: BookingInfo["id"]) {
+	if (state === null) {
+		return null
+	}
+	const allBookings = Object.values(state.bookingsByDate).flat()
+	const requestedBooking = allBookings.find(
+		(item) => typeof item !== "string" && item?.id === id
+	)
+	if (requestedBooking === undefined || typeof requestedBooking === "string") {
+		return null
+	}
+	return requestedBooking
+}
 
 export const bookingsReducer = bookingsSlice.reducer
 export const { activateDate, reset } = bookingsSlice.actions
