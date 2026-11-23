@@ -1,6 +1,8 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
+import { Provider } from "react-redux"
 
+import { store } from "./store/index.ts"
 import { App } from "./ui/App/App"
 
 const rootElement = document.getElementById("root")
@@ -13,6 +15,8 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
 	<StrictMode>
-		<App />
+		<Provider store={store}>
+			<App />
+		</Provider>
 	</StrictMode>
 )

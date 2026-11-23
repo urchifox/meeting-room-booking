@@ -1,25 +1,33 @@
 import styles from "./PageBooking.module.css"
 
-import dayjs from "dayjs"
 import { useEffect, useState } from "react"
 
+import { getToday } from "../../domain/date"
 import {
-	getBookings,
-	tryAddBooking,
-	tryDeleteBooking,
-	tryUpdateBooking,
-} from "../../domain/bookings"
-import type { BookingInfo } from "../../types/types"
+	BookingsStatus,
+	activateDate,
+	addBooking,
+	deleteBooking,
+	loadBookingsForDay,
+	retryLoadBookingsForDay,
+	selectActiveDate,
+	selectBookingsByDay,
+	selectIsMutationPending,
+	updateBooking,
+} from "../../store/bookings"
+import type { BookingInfo, YearMonthDay } from "../../types/types"
 import { BookingForm } from "../BookingForm/BookingForm"
 import { BookingsList } from "../BookingsList/BookingsList"
 import { Button } from "../Button/Button"
 import { Modal } from "../Modal/Modal"
+import { useAppDispatch, useAppSelector } from "../hooks/store"
 
 export function PageBooking() {
-	const today = dayjs().format("YYYY-MM-DD")
-	const [date, setDate] = useState<string>(today)
-	const [bookings, setBookings] = useState<Array<BookingInfo> | null>(null)
-	const [isError, setError] = useState<boolean>(false)
+	const today = getToday()
+	const dispatch = useAppDispatch()
+	const date = useAppSelector(selectActiveDate)
+	const isMutationPending = useAppSelector(selectIsMutationPending)
+	const bookings = useAppSelector((state) => selectBookingsByDay(state, date))
 	const [isModalFormOpen, setIsModalFormOpen] = useState(false)
 	const [bookingInfo, setBookingInfo] = useState<BookingInfo | undefined>(
 		undefined
@@ -28,71 +36,66 @@ export function PageBooking() {
 	const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
 
 	const onAddClick = () => {
+		if (isMutationPending) {
+			return
+		}
 		setBookingInfo(undefined)
 		setIsModalFormOpen(true)
 	}
 
 	const onEditClick = (booking: BookingInfo) => {
+		if (isMutationPending) {
+			return
+		}
 		setBookingInfo(booking)
 		setIsModalFormOpen(true)
 	}
 
-	const showErrorMessage = (errors: Array<string>) => {
-		setErrorMessage(errors.join("\n"))
+	const showErrorMessage = (error: unknown) => {
+		let errorMessage = "Unknown error"
+		if (Array.isArray(error)) {
+			errorMessage = error.join("\n")
+		} else if (typeof error === "string") {
+			errorMessage = error
+		} else if (
+			typeof error === "object" &&
+			error !== null &&
+			"name" in error &&
+			typeof error.name === "string"
+		) {
+			errorMessage = error.name
+		}
+		setErrorMessage(errorMessage)
 		setIsErrorModalOpen(true)
 	}
 
 	const onSubmit = (booking: BookingInfo) => {
-		const otherBookings = (bookings ?? []).filter(
-			(item) => item.id !== booking.id
-		)
-		const saveBooking = bookingInfo ? tryUpdateBooking : tryAddBooking
+		if (isMutationPending) {
+			return
+		}
+		const isNewBooking = bookingInfo === undefined
+		const action = isNewBooking ? addBooking : updateBooking
 
-		void saveBooking({ booking, otherBookings }).then((result) => {
-			if (result.valid) {
-				setBookings((current) => {
-					if (current === null) {
-						return [booking]
-					}
-
-					const exists = current.some((item) => item.id === booking.id)
-					if (!exists) {
-						return [...current, booking]
-					}
-
-					return current.map((item) =>
-						item.id === booking.id ? booking : item
-					)
-				})
-				setIsModalFormOpen(false)
-				return
-			}
-
-			showErrorMessage(result.errors)
-		})
+		dispatch(action(booking))
+			.unwrap()
+			.then(() => setIsModalFormOpen(false))
+			.catch(showErrorMessage)
 	}
 
 	const onDeleteClick = (id: string) => {
-		void tryDeleteBooking(id).then((result) => {
-			if (!result.valid) {
-				showErrorMessage(result.errors)
-				return
-			}
-
-			setBookings((current) => {
-				if (current === null) {
-					return current
-				}
-
-				return current.filter((item) => item.id !== id)
-			})
-		})
+		if (isMutationPending) {
+			return
+		}
+		dispatch(deleteBooking(id)).unwrap().catch(showErrorMessage)
 	}
 
 	const onDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const newDate = event.target.value ?? today
-		setDate(newDate)
-		setBookings(null)
+		dispatch(activateDate(newDate as YearMonthDay))
+	}
+
+	const onRetryClick = () => {
+		dispatch(retryLoadBookingsForDay(date)).unwrap().catch(showErrorMessage)
 	}
 
 	useEffect(() => {
@@ -100,38 +103,41 @@ export function PageBooking() {
 			return
 		}
 
-		let cancelled = false
-		getBookings(date)
-			.then((value) => {
-				if (!cancelled) {
-					setBookings(value)
-				}
-			})
-			.catch(() => {
-				if (!cancelled) {
-					setError(true)
-				}
-			})
+		const request = dispatch(loadBookingsForDay(date))
+		void request.unwrap().catch(() => {})
+
 		return () => {
-			cancelled = true
+			request.abort()
 		}
-	}, [bookings, date])
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [date, dispatch])
 
 	return (
 		<section className={styles.pageBooking}>
 			<h1>Book a meeting room</h1>
-			<Button onClick={onAddClick}>Add Booking</Button>
+			<Button onClick={onAddClick} disabled={isMutationPending}>
+				Add Booking
+			</Button>
 			<input
 				type="date"
-				id="date"
+				id="bookings-list-date"
 				name="date"
 				min={today}
 				value={date}
 				onChange={onDateChange}
 			/>
-			{bookings === null && <p>Loading...</p>}
-			{isError && <p>Error loading bookings</p>}
-			{bookings !== null && (
+			{(bookings === null || bookings === BookingsStatus.LOADING) && (
+				<p>Loading...</p>
+			)}
+			{bookings === BookingsStatus.ERROR && (
+				<>
+					<p>Error loading bookings</p>
+					<Button onClick={onRetryClick} disabled={isMutationPending}>
+						Retry
+					</Button>
+				</>
+			)}
+			{Array.isArray(bookings) && (
 				<BookingsList
 					bookings={bookings}
 					onDeleteClick={onDeleteClick}

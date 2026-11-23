@@ -1,21 +1,22 @@
 // mock data and functions for server adapter
+import { getToday } from "../domain/date"
 import type { BookingInfo } from "../types/types"
 
 const seedBookings: Array<BookingInfo> = [
 	{
 		id: "1",
-		date: "2026-10-28",
+		date: getToday(),
 		timeRange: { start: "10:00", end: "11:00" },
 		title: "Meeting with John",
 	},
 	{
 		id: "2",
-		date: "2026-10-28",
+		date: getToday(),
 		timeRange: { start: "11:00", end: "12:00" },
 	},
 	{
 		id: "3",
-		date: "2026-10-29",
+		date: getToday(),
 		timeRange: { start: "13:00", end: "14:00" },
 	},
 ]

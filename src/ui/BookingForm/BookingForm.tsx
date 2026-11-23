@@ -4,8 +4,10 @@ import { type ChangeEvent, useState } from "react"
 
 import { getToday, isHourMinute, isYearMonthDay } from "../../domain/date"
 import { END_TIME, START_TIME } from "../../domain/rules"
+import { selectIsMutationPending } from "../../store/bookings"
 import type { BookingInfo, HourMinute, YearMonthDay } from "../../types/types"
 import { Button } from "../Button/Button"
+import { useAppSelector } from "../hooks/store"
 
 type BookingFormValues = {
 	title: string
@@ -41,6 +43,7 @@ export function BookingForm({
 	bookingInfo?: BookingInfo
 	onSubmit: (booking: BookingInfo) => void
 }) {
+	const isMutationPending = useAppSelector(selectIsMutationPending)
 	const [values, setValues] = useState(() => toFormValues(bookingInfo))
 	const [sourceBooking, setSourceBooking] = useState(bookingInfo)
 
@@ -105,7 +108,7 @@ export function BookingForm({
 				<label htmlFor="date">Date</label>
 				<input
 					type="date"
-					id="date"
+					id="booking-date"
 					name="date"
 					value={values.date}
 					onChange={onChange}
@@ -140,7 +143,7 @@ export function BookingForm({
 				/>
 			</div>
 
-			<Button onClick={submitBooking}>
+			<Button onClick={submitBooking} disabled={isMutationPending}>
 				{bookingInfo ? "Update Booking" : "Add Booking"}
 			</Button>
 		</form>
