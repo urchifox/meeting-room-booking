@@ -126,6 +126,15 @@ function onLoadFulfilled({
 	}
 }
 
+export const retryLoadBookingsForDay = createAsyncThunk<
+	Array<BookingInfo>,
+	YearMonthDay,
+	{ state: RootState; rejectValue: string }
+>("bookings/retryLoadBookingsForDay", (date, { dispatch }) => {
+	dispatch(bookingsSlice.actions.removeBookingsForDate(date))
+	return dispatch(loadBookingsForDay(date)).unwrap()
+})
+
 let isPending: boolean = false
 
 export const addBooking = createAsyncThunk<

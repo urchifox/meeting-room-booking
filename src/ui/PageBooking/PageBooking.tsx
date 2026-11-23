@@ -9,6 +9,7 @@ import {
 	addBooking,
 	deleteBooking,
 	loadBookingsForDay,
+	retryLoadBookingsForDay,
 	selectActiveDate,
 	selectBookingsByDay,
 	updateBooking,
@@ -107,7 +108,14 @@ export function PageBooking() {
 			{(bookings === null || bookings === BookingsStatus.LOADING) && (
 				<p>Loading...</p>
 			)}
-			{bookings === BookingsStatus.ERROR && <p>Error loading bookings</p>}
+			{bookings === BookingsStatus.ERROR && (
+				<>
+					<p>Error loading bookings</p>
+					<Button onClick={() => void dispatch(retryLoadBookingsForDay(date))}>
+						Retry
+					</Button>
+				</>
+			)}
 			{Array.isArray(bookings) && (
 				<BookingsList
 					bookings={bookings}
